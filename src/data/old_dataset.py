@@ -1,7 +1,9 @@
 from typing import Tuple
 import numpy as np
+from src.configs import PATH_TO_DIRECTORY
 
 nuc_arr = ['A','C','G','T']
+
 
 #Function for calculating modified probability of splicing at SD1
 def prob_SD1 (sd1_freq: float, sd2_freq: float) -> float:
@@ -19,8 +21,8 @@ def seq_to_arr(seq: str) -> np.ndarray:
     return arr_rep
 
 # Storing model inputs (DNA sequences) and outputs (probability of splicing at SD1)
-def get_dataset() -> Tuple[np.ndarray, np.ndarray]:
-    dataset_path = "../5SS_compressed.txt"
+def get_dataset() -> Tuple[np.ndarray, np.ndarray, list]:
+    dataset_path = PATH_TO_DIRECTORY + '/old_data/5SS_compressed.txt'
     seq_len = 101
     n = 265137
     inputs = np.zeros((n,seq_len, 4))
@@ -28,10 +30,13 @@ def get_dataset() -> Tuple[np.ndarray, np.ndarray]:
 
     with open(dataset_path) as f:
         ind = 0
+        mod_line_3 = []
         for line in f:
             mod_line = line.split('\t')
             inputs[ind] = seq_to_arr(mod_line[1])
+            mod_line_3.append(mod_line[3])
+            # use slicing to remove new line character
             prob_s1[ind] = prob_SD1(float(mod_line[2]), float(mod_line[3][:-1]))
             ind += 1
     
-    return np.array(inputs), np.array(prob_s1)
+    return np.array(inputs), np.array(prob_s1), mod_line_3

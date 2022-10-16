@@ -1,0 +1,1 @@
+PATH_TO_DIRECTORY='/Users/tingchen/columbia_stuff/CNN-GP-AL/active-learning-cnns-gps'

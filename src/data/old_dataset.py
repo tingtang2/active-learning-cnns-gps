@@ -21,7 +21,7 @@ def seq_to_arr(seq: str) -> np.ndarray:
     return arr_rep
 
 # Storing model inputs (DNA sequences) and outputs (probability of splicing at SD1)
-def get_dataset() -> Tuple[np.ndarray, np.ndarray, list]:
+def get_dataset() -> Tuple[np.ndarray, np.ndarray]:
     dataset_path = PATH_TO_DIRECTORY + '/old_data/5SS_compressed.txt'
     seq_len = 101
     n = 265137
@@ -30,13 +30,11 @@ def get_dataset() -> Tuple[np.ndarray, np.ndarray, list]:
 
     with open(dataset_path) as f:
         ind = 0
-        mod_line_3 = []
         for line in f:
             mod_line = line.split('\t')
             inputs[ind] = seq_to_arr(mod_line[1])
-            mod_line_3.append(mod_line[3])
             # use slicing to remove new line character
             prob_s1[ind] = prob_SD1(float(mod_line[2]), float(mod_line[3][:-1]))
             ind += 1
     
-    return np.array(inputs), np.array(prob_s1), mod_line_3
+    return np.array(inputs), np.array(prob_s1)

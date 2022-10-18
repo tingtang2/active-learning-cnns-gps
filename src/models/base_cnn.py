@@ -16,10 +16,11 @@ class BaseCNN(nn.Module):
         self.pool1 = nn.MaxPool1d(kernel_size=3)
         self.conv2 = nn.Conv1d(in_channels=self.seq_len, out_channels=self.seq_len//2, kernel_size=4)
         self.pool2 = nn.MaxPool1d(kernel_size=3)
-        self.dense = nn.Linear(in_features=self.seq_len//2, out_features=MLP_out_dim)
+        self.dense = nn.Linear(in_features=450, out_features=MLP_out_dim)
         self.output = nn.Linear(in_features=MLP_out_dim, out_features=1)
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = x.transpose(1, 2).double()
         x = self.conv1(x)
         x = nn.functional.relu(x)
         x = self.pool1(x)

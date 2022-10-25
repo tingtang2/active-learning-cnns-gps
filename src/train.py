@@ -1,4 +1,5 @@
 import argparse
+from distutils.command.config import config
 import sys
 from src.models.base_cnn import BaseCNN
 from src.data.data_loader import get_splits, build_dataloaders
@@ -6,6 +7,7 @@ from torch.optim import SGD
 from torch.nn import MSELoss
 import torch
 from torch.utils.data import DataLoader
+from tqdm import trange
 
 def train(model, 
           optimizer, 
@@ -13,17 +15,50 @@ def train(model,
           data_loader):
     raise NotImplementedError
 
-def active_iteration(model, 
-                     train_loader: DataLoader, 
+def eval(model,
+         loader,
+         criterion):
+    model.eval()
+    preds = []
+    full_labels = []
+
+    with torch.no_grad():
+        for j, batch in enumerate(loader):
+            examples, labels = batch     
+        
+            preds += model(examples).reshape(-1)
+            full_labels += labels.tolist()
+    
+    return criterion(preds, full_labels)
+
+
+def active_iteration(model,
+                     train_loader: DataLoader,
+                     test_loader: DataLoader,
+                     optimizer,
+                     criterion,
+                     epochs: int, 
                      **kwargs):
     
-    
-    model.fit(X_train_rand, y_train_rand, epochs=num_epochs, batch_size=batchsize, verbose=0)
-    f_rand = K.function([model_rand.layers[0].input, K.learning_phase()], 
-                [model_rand.layers[-1].output])
-    predictions_with_uncertainty = predict_with_uncertainty(f_rand, X_test, n_iter=mse_dropout_iterations)
-    y_predicted = predictions_with_uncertainty[0]
-    mse = np.mean(np.square(y_test-y_predicted))
+    for epoch in trange(epochs):
+        for batch in train_loader:
+            optimizer.zero_grad()    
+            examples, labels = batch     
+        
+            predictions = model(examples).reshape(-1)
+
+            loss = criterion(predictions, labels.float())
+
+            loss.backward()
+            optimizer.step()
+
+    # f_rand = K.function([model_rand.layers[0].input, K.learning_phase()], 
+    #             [model_rand.layers[-1].output])
+    # predictions_with_uncertainty = predict_with_uncertainty(f_rand, X_test, n_iter=mse_dropout_iterations)
+    # y_predicted = predictions_with_uncertainty[0]
+    # mse = np.mean(np.square(y_test-y_predicted))
+
+    return eval(model, test_loader, criterion)
 
 
 def main() -> int:
@@ -41,7 +76,7 @@ def main() -> int:
         'tau_inv_proportion': 0.15
     }
 
-    train_loader, test_loader, shape = build_dataloaders()
+    train_loader, test_loader, shape = build_dataloaders(batch_size=configs['batch_size'])
     X_train, y_train, X_test, y_test = get_splits()
     model = BaseCNN().double()
     print('initialized model')

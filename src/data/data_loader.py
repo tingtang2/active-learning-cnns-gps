@@ -26,8 +26,8 @@ class FivePSplicingDataset(Dataset):
 def get_splits():
     X, y = get_dataset()
     
-    train_indicies = np.load(Path(PATH_TO_DIRECTORY, 'old_data', 'trainindices1.npy'))
-    test_indicies = np.load(Path(PATH_TO_DIRECTORY, 'old_data', 'testindices1.npy'))
+    train_indicies = np.load(Path(PATH_TO_DIRECTORY, 'old_data', 'data_indicies', 'trainindices1.npy'))
+    test_indicies = np.load(Path(PATH_TO_DIRECTORY, 'old_data', 'data_indicies', 'testindices1.npy'))
     
     X_train, y_train = X[train_indicies], y[train_indicies]
     X_test, y_test = X[test_indicies], y[test_indicies]
@@ -44,8 +44,8 @@ def build_dataloaders(batch_size: int = 128, use_old_split: bool = True):
     X, y = get_dataset()
     
     if use_old_split:
-        train_indicies = np.load(Path(PATH_TO_DIRECTORY, 'old_data', 'trainindices1.npy'))
-        test_indicies = np.load(Path(PATH_TO_DIRECTORY, 'old_data', 'testindices1.npy'))
+        train_indicies = np.load(Path(PATH_TO_DIRECTORY, 'old_data', 'data_indicies', 'trainindices1.npy'))
+        test_indicies = np.load(Path(PATH_TO_DIRECTORY, 'old_data', 'data_indicies','testindices1.npy'))
     else:
         train_indicies = None
         test_indicies = None

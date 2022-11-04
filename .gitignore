@@ -133,6 +133,6 @@ dmypy.json
 
 .DS_Store
 Pipfile.lock
-Pipfile.lock
-.gitignore
+
 old_data/data_indices/trainindices1.npy
+old_data/data_indices/testindices1.npy

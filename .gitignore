@@ -134,5 +134,4 @@ dmypy.json
 .DS_Store
 Pipfile.lock
 
-old_data/data_indices/trainindices1.npy
-old_data/data_indices/testindices1.npy
+*.npy

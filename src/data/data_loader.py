@@ -36,31 +36,17 @@ def get_splits():
 
     return X_train, y_train, X_test, y_test
 
-def build_dataloaders(batch_size: int = 128, use_old_split: bool = True):
+def create_dataloaders(X_train, y_train, X_test, y_test, batch_size: int = 128):
     '''
         Loads dataset and preprocesses, returns torch dataloaders for 
         training and eval.
     '''
-    X, y = get_dataset()
-    
-    if use_old_split:
-        train_indicies = np.load(Path(PATH_TO_DIRECTORY, 'old_data', 'data_indicies', 'trainindices1.npy'))
-        test_indicies = np.load(Path(PATH_TO_DIRECTORY, 'old_data', 'data_indicies','testindices1.npy'))
-    else:
-        train_indicies = None
-        test_indicies = None
-    
-    X_train, y_train = X[train_indicies], y[train_indicies]
-    X_test, y_test = X[test_indicies], y[test_indicies]
-        
-    print(f'Train X dimensions: {X_train.shape} Test X dimensions: {X_test.shape}')
-    
     # set up dataset objects
     train_dataset = FivePSplicingDataset(torch.from_numpy(X_train), torch.from_numpy(y_train))
     test_dataset = FivePSplicingDataset(torch.from_numpy(X_test), torch.from_numpy(y_test))
 
     # set up data loaders
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=len(test_dataset), shuffle=False)
 
-    return train_loader, test_loader, X.shape[1]
+    return train_loader, test_loader, X_train.shape[1]

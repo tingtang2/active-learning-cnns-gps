@@ -23,14 +23,14 @@ def enable_dropout(model):
             m.train()
 
 def eval(model,
-         loader,
+         loader: DataLoader,
          criterion,
          mc_dropout_iterations: int):
     model.eval()
     enable_dropout(model)
     
-    predictions = torch.empty((mc_dropout_iterations, 26513))
-    full_labels: torch.Tensor = torch.empty([])
+    predictions = torch.empty((mc_dropout_iterations, loader.dataset.sequences.size(0)))
+    full_labels: torch.Tensor = loader.dataset.proportions
 
     with torch.no_grad():
         for i in trange(mc_dropout_iterations):
@@ -38,8 +38,6 @@ def eval(model,
                 examples, labels = batch     
             
                 predictions[i] = model(examples).reshape(-1)
-                if i == 0:
-                    full_labels = labels
     preds = torch.mean(predictions, dim=0).reshape(-1)
 
     return criterion(preds, full_labels.double())
@@ -71,7 +69,7 @@ def active_iteration(model: torch.nn.Module,
 
             running_loss += loss.item()
 
-        print(f'epoch loss: {running_loss}')
+        print(f'epoch {epoch} loss: {running_loss}')
 
     return eval(model, test_loader, criterion, mc_dropout_iterations)
 
@@ -86,12 +84,13 @@ def main() -> int:
         'sample_size': 5000,
         'num_epochs': 300,
         'acq_fn_dropout_iterations': 50,
-        'mc_dropout_iterations': 100,
+        'mc_dropout_iterations': 5,
         'size_train': 75,
         'tau_inv_proportion': 0.15,
         'begin_train_set_size': 75,
         'l2_penalty': 0.025
     }
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     X_train, y_train, X_test, y_test = get_splits()
     model = BaseCNN().double()

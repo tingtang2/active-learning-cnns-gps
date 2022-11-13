@@ -18,10 +18,11 @@ from typing import List
 from pathlib import Path
 
 import pandas as pd
+import json
 
 
-def active_train(model, 
-          optimizer, 
+def active_train(model_type, 
+          optimizer_type, 
           criterion, 
           X_train,
           y_train,
@@ -31,21 +32,36 @@ def active_train(model,
           acquisition_fn,
           begin_train_set_size,
           num_acquisitions,
+          l2_penalty,
           **kwargs) -> List[float]:
     
     train_pool = [i for i in range(begin_train_set_size)]
     acquisition_pool = [i for i in range(begin_train_set_size, X_train.shape[0])]
     mse = []
-
+    
+    # experiment setup stuff
     for round in trange(num_acquisitions):
         X_train_data = X_train[train_pool]
         y_train_data = y_train[train_pool]
         
+        model = model_type().double().to(device)
+        optimizer = optimizer_type(model.parameters(), lr=0.001, weight_decay=l2_penalty/len(train_pool))
+        
         train_dataloader, test_dataloader, num_feats = create_dataloaders(X_train=X_train_data, y_train=y_train_data, X_test=X_test, y_test=y_test, device=device)
-        new_mse = active_iteration(model=model, train_loader=train_dataloader, test_loader=test_dataloader, optimizer=optimizer, criterion=criterion, device=device, **kwargs)
+        new_mse, new_var = active_iteration(model=model, 
+                                            train_loader=train_dataloader, 
+                                            test_loader=test_dataloader, 
+                                            optimizer=optimizer, 
+                                            criterion=criterion, 
+                                            device=device, 
+                                            **kwargs)
+        
         mse.append(new_mse.item())
 
-        new_points = acquisition_fn(acquisition_pool)
+        new_points = acquisition_fn(pool_points=acquisition_pool, 
+                                    X_train=X_train, 
+                                    y_train=y_train, 
+                                    model=model)
         for point in new_points:
             train_pool.append(point)
             acquisition_pool.remove(point)
@@ -74,9 +90,9 @@ def eval(model,
                 examples, labels = batch     
             
                 predictions[i] = model(examples).reshape(-1)
-    preds = torch.mean(predictions, dim=0).reshape(-1)
+    pred_var, preds = torch.var_mean(predictions, dim=0)
 
-    return criterion(preds, full_labels.double())
+    return criterion(preds, full_labels.double()), pred_var
 
 
 # pass in updated train and test loaders at each iteration
@@ -122,30 +138,41 @@ def main() -> int:
     configs = {
         'epochs': 100,
         'batch_size': 128,
-        'num_acquisitions': 1000,
+        'num_acquisitions': 100,
         'acquisition_batch_size': 1,
         'sample_size': 5000,
-        'acq_fn_dropout_iterations': 50,
-        'mc_dropout_iterations': 100,
+        'mc_dropout_iterations': 10,
         'size_train': 75,
         'tau_inv_proportion': 0.15,
         'begin_train_set_size': 75,
         'l2_penalty': 0.025,
-        'save_dir': 'saved_metrics/'
+        'save_dir': 'saved_metrics/',
+        'acquisition_fn_type': 'random'
     }
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     X_train, y_train, X_test, y_test = get_splits()
-    model = BaseCNN().double().to(device)
-    print('initialized model')
-
+    
     # experiment setup stuff
     criterion = MSELoss()
-    optimizer = RMSprop(model.parameters(), lr=0.001, weight_decay=configs['l2_penalty']/configs['begin_train_set_size'])
+    if configs['acquisition_fn_type'] == 'random':
+        acquisition_fn = acquisition_functions.random
 
-    mse = active_train(model, optimizer, criterion, X_train, y_train, X_test, y_test, device=device, acquisition_fn=acquisition_functions.random,  **configs) # list to hold metrics
+    mse = active_train(model_type=BaseCNN, 
+                       optimizer_type=RMSprop, 
+                       criterion=criterion, 
+                       X_train=X_train, 
+                       y_train=y_train, 
+                       X_test=X_test, 
+                       y_test=y_test, 
+                       device=device, 
+                       acquisition_fn=acquisition_fn,  
+                       **configs) 
 
     plot('Mean Square Error', mse, **configs)
+    with open(Path(Path.home(), configs['save_dir'], f'{configs["acquisition_fn_type"]}.json'), 'w') as f:
+        json.dump(mse, f)
+
 
     return 0
 

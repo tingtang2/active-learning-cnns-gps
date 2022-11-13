@@ -40,7 +40,6 @@ def active_train(model_type,
     acquisition_pool = [i for i in range(begin_train_set_size, X_train.shape[0])]
     mse = []
     
-    # experiment setup stuff
     for round in trange(num_acquisitions):
         X_train_data = X_train[train_pool]
         y_train_data = y_train[train_pool]
@@ -62,7 +61,11 @@ def active_train(model_type,
         new_points = acquisition_fn(pool_points=acquisition_pool, 
                                     X_train=X_train, 
                                     y_train=y_train, 
-                                    model=model)
+                                    model=model, 
+                                    criterion=criterion,
+                                    device=device,
+                                    **kwargs)
+
         for point in new_points:
             train_pool.append(point)
             acquisition_pool.remove(point)
@@ -112,14 +115,14 @@ def main() -> int:
         'batch_size': 128,
         'num_acquisitions': 100,
         'acquisition_batch_size': 1,
-        'sample_size': 5000,
+        'pool_sample_size': 5000,
         'mc_dropout_iterations': 10,
         'size_train': 75,
         'tau_inv_proportion': 0.15,
         'begin_train_set_size': 75,
         'l2_penalty': 0.025,
         'save_dir': 'saved_metrics/',
-        'acquisition_fn_type': 'random'
+        'acquisition_fn_type': 'max_variance'
     }
     
     # get device and data
@@ -130,7 +133,7 @@ def main() -> int:
     criterion = MSELoss()
     if configs['acquisition_fn_type'] == 'random':
         acquisition_fn = acquisition_functions.random
-    elif configs['acqusition_fn_type'] == 'max_variance':
+    elif configs['acquisition_fn_type'] == 'max_variance':
         acquisition_fn = acquisition_functions.max_variance
 
     # run active learning experiment

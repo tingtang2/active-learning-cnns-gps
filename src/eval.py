@@ -4,6 +4,8 @@ import sys
 from torch.utils.data import DataLoader
 import torch
 
+from typing import Tuple
+
 def enable_dropout(model):
     """ Function to enable the dropout layers during test-time """
     for m in model.modules():
@@ -15,7 +17,8 @@ def eval(model,
          loader: DataLoader,
          criterion,
          mc_dropout_iterations: int,
-         device: torch.device):
+         device: torch.device,
+         **kwargs) -> Tuple[torch.Tensor, torch.Tensor]:
     model.eval()
     enable_dropout(model)
     

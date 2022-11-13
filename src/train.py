@@ -7,6 +7,8 @@ from torch.nn import MSELoss
 import torch
 from torch.utils.data import DataLoader
 from tqdm import trange
+import plotly.express as px
+
 
 def active_train(model, 
           optimizer, 
@@ -25,11 +27,12 @@ def enable_dropout(model):
 def eval(model,
          loader: DataLoader,
          criterion,
-         mc_dropout_iterations: int):
+         mc_dropout_iterations: int,
+         device: torch.device):
     model.eval()
     enable_dropout(model)
     
-    predictions = torch.empty((mc_dropout_iterations, loader.dataset.sequences.size(0)))
+    predictions = torch.empty((mc_dropout_iterations, loader.dataset.sequences.size(0))).to(device)
     full_labels: torch.Tensor = loader.dataset.proportions
 
     with torch.no_grad():
@@ -51,6 +54,7 @@ def active_iteration(model: torch.nn.Module,
                      criterion,
                      epochs: int,
                      mc_dropout_iterations: int,
+                     device: torch.device,
                      **kwargs):
     
     model.train()
@@ -71,7 +75,7 @@ def active_iteration(model: torch.nn.Module,
 
         print(f'epoch {epoch} loss: {running_loss}')
 
-    return eval(model, test_loader, criterion, mc_dropout_iterations)
+    return eval(model, test_loader, criterion, mc_dropout_iterations, device=device)
 
 
 def main() -> int:
@@ -84,16 +88,17 @@ def main() -> int:
         'sample_size': 5000,
         'num_epochs': 300,
         'acq_fn_dropout_iterations': 50,
-        'mc_dropout_iterations': 5,
+        'mc_dropout_iterations': 200,
         'size_train': 75,
         'tau_inv_proportion': 0.15,
         'begin_train_set_size': 75,
-        'l2_penalty': 0.025
+        'l2_penalty': 0.025,
+        'save_dir': '~/saved_metrics/'
     }
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     X_train, y_train, X_test, y_test = get_splits()
-    model = BaseCNN().double()
+    model = BaseCNN().double().to(device)
     print('initialized model')
 
     # experiment setup stuff
@@ -106,9 +111,9 @@ def main() -> int:
     X_train_data = X_train[:configs['begin_train_set_size']]
     y_train_data = y_train[:configs['begin_train_set_size']]
 
-    train_dataloader, test_dataloader, num_feats = create_dataloaders(X_train=X_train_data, y_train=y_train_data, X_test=X_test, y_test=y_test)
+    train_dataloader, test_dataloader, num_feats = create_dataloaders(X_train=X_train_data, y_train=y_train_data, X_test=X_test, y_test=y_test, device=device)
 
-    print(active_iteration(model=model, train_loader=train_dataloader, test_loader=test_dataloader, optimizer=optimizer, criterion=criterion, **configs))
+    print(active_iteration(model=model, train_loader=train_dataloader, test_loader=test_dataloader, optimizer=optimizer, criterion=criterion, device=device, **configs))
 
 
     # y_hat = model(torch.from_numpy(X[:10]))

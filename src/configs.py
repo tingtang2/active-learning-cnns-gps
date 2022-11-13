@@ -1,1 +1,1 @@
-PATH_TO_DIRECTORY='/Users/tingchen/active-learning-cnns-gps'
+PATH_TO_DIRECTORY='/home/tingchen/active-learning-cnns-gps'

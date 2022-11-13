@@ -36,14 +36,14 @@ def get_splits():
 
     return X_train, y_train, X_test, y_test
 
-def create_dataloaders(X_train, y_train, X_test, y_test, batch_size: int = 128):
+def create_dataloaders(X_train, y_train, X_test, y_test, device:torch.device, batch_size: int = 128):
     '''
         Loads dataset and preprocesses, returns torch dataloaders for 
         training and eval.
     '''
     # set up dataset objects
-    train_dataset = FivePSplicingDataset(torch.from_numpy(X_train), torch.from_numpy(y_train))
-    test_dataset = FivePSplicingDataset(torch.from_numpy(X_test), torch.from_numpy(y_test))
+    train_dataset = FivePSplicingDataset(torch.from_numpy(X_train).to(device), torch.from_numpy(y_train).to(device))
+    test_dataset = FivePSplicingDataset(torch.from_numpy(X_test).to(device), torch.from_numpy(y_test).to(device))
 
     # set up data loaders
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)

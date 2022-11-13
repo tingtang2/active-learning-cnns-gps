@@ -4,6 +4,7 @@ import sys
 from src.models.base_cnn import BaseCNN
 from src.data.data_loader import get_splits, create_dataloaders
 from src import acquisition_functions
+from src.eval import eval
 
 from torch.optim import SGD, RMSprop
 from torch.nn import MSELoss
@@ -67,33 +68,6 @@ def active_train(model_type,
             acquisition_pool.remove(point)
     return mse
 
-def enable_dropout(model):
-    """ Function to enable the dropout layers during test-time """
-    for m in model.modules():
-        if m.__class__.__name__.startswith('Dropout'):
-            m.train()
-
-def eval(model,
-         loader: DataLoader,
-         criterion,
-         mc_dropout_iterations: int,
-         device: torch.device):
-    model.eval()
-    enable_dropout(model)
-    
-    predictions = torch.empty((mc_dropout_iterations, loader.dataset.sequences.size(0))).to(device)
-    full_labels: torch.Tensor = loader.dataset.proportions
-
-    with torch.no_grad():
-        for i in range(mc_dropout_iterations):
-            for j, batch in enumerate(loader):
-                examples, labels = batch     
-            
-                predictions[i] = model(examples).reshape(-1)
-    pred_var, preds = torch.var_mean(predictions, dim=0)
-
-    return criterion(preds, full_labels.double()), pred_var
-
 
 # pass in updated train and test loaders at each iteration
 def active_iteration(model: torch.nn.Module,
@@ -122,15 +96,13 @@ def active_iteration(model: torch.nn.Module,
 
             running_loss += loss.item()
 
-        #print(f'epoch {epoch} loss: {running_loss}')
-
     return eval(model, test_loader, criterion, mc_dropout_iterations, device=device)
 
-def plot(name: str, metrics: List[float], save_dir: str, **kwargs) -> None:
+def plot(name: str, metrics: List[float], save_dir: str, acquisition_fn_type: str, **kwargs) -> None:
     df = pd.DataFrame({name: [item for item in metrics], 'iteration': [i for i in range(1, len(metrics) + 1)]})
-    fig = px.line(df, x='iteration', y=name, title=f'{name} as a Function of Iteration')
-    fig.write_html(Path(Path.home(), save_dir, 'fig.html'))
-    fig.write_image(Path(Path.home(), save_dir, 'fig.png'))
+    fig = px.line(df, x='iteration', y=name, title=f'{acquisition_fn_type}: {name} as a Function of Iteration')
+    fig.write_html(Path(Path.home(), save_dir, f'{acquisition_fn_type}.html'))
+    fig.write_image(Path(Path.home(), save_dir, f'{acquisition_fn_type}.png'))
 
 
 def main() -> int:
@@ -149,15 +121,19 @@ def main() -> int:
         'save_dir': 'saved_metrics/',
         'acquisition_fn_type': 'random'
     }
+    
+    # get device and data
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
     X_train, y_train, X_test, y_test = get_splits()
     
     # experiment setup stuff
     criterion = MSELoss()
     if configs['acquisition_fn_type'] == 'random':
         acquisition_fn = acquisition_functions.random
+    elif configs['acqusition_fn_type'] == 'max_variance':
+        acquisition_fn = acquisition_functions.max_variance
 
+    # run active learning experiment
     mse = active_train(model_type=BaseCNN, 
                        optimizer_type=RMSprop, 
                        criterion=criterion, 
@@ -169,10 +145,10 @@ def main() -> int:
                        acquisition_fn=acquisition_fn,  
                        **configs) 
 
-    plot('Mean Square Error', mse, **configs)
+    # plot and save
+    plot(name='Mean Square Error', metrics=mse, **configs)
     with open(Path(Path.home(), configs['save_dir'], f'{configs["acquisition_fn_type"]}.json'), 'w') as f:
         json.dump(mse, f)
-
 
     return 0
 

@@ -1,22 +1,55 @@
 import argparse
 import sys
+
 from src.models.base_cnn import BaseCNN
 from src.data.data_loader import get_splits, create_dataloaders
+from src import acquisition_functions
+
 from torch.optim import SGD, RMSprop
 from torch.nn import MSELoss
 import torch
 from torch.utils.data import DataLoader
+
 from tqdm import trange
 import plotly.express as px
+import numpy as np
+
+from typing import List
+from pathlib import Path
+
+import pandas as pd
 
 
 def active_train(model, 
           optimizer, 
           criterion, 
-          data_loader,
-          acquisition_function):
+          X_train,
+          y_train,
+          X_test,
+          y_test,
+          device,
+          acquisition_fn,
+          begin_train_set_size,
+          num_acquisitions,
+          **kwargs) -> List[float]:
     
-    pass
+    train_pool = [i for i in range(begin_train_set_size)]
+    acquisition_pool = [i for i in range(begin_train_set_size, X_train.shape[0])]
+    mse = []
+
+    for round in trange(num_acquisitions):
+        X_train_data = X_train[train_pool]
+        y_train_data = y_train[train_pool]
+        
+        train_dataloader, test_dataloader, num_feats = create_dataloaders(X_train=X_train_data, y_train=y_train_data, X_test=X_test, y_test=y_test, device=device)
+        new_mse = active_iteration(model=model, train_loader=train_dataloader, test_loader=test_dataloader, optimizer=optimizer, criterion=criterion, device=device, **kwargs)
+        mse.append(new_mse.item())
+
+        new_points = acquisition_fn(acquisition_pool)
+        for point in new_points:
+            train_pool.append(point)
+            acquisition_pool.remove(point)
+    return mse
 
 def enable_dropout(model):
     """ Function to enable the dropout layers during test-time """
@@ -36,7 +69,7 @@ def eval(model,
     full_labels: torch.Tensor = loader.dataset.proportions
 
     with torch.no_grad():
-        for i in trange(mc_dropout_iterations):
+        for i in range(mc_dropout_iterations):
             for j, batch in enumerate(loader):
                 examples, labels = batch     
             
@@ -58,7 +91,7 @@ def active_iteration(model: torch.nn.Module,
                      **kwargs):
     
     model.train()
-    for epoch in trange(epochs):
+    for epoch in range(epochs):
         running_loss = 0.0
         for batch in train_loader:
             optimizer.zero_grad()    
@@ -73,9 +106,15 @@ def active_iteration(model: torch.nn.Module,
 
             running_loss += loss.item()
 
-        print(f'epoch {epoch} loss: {running_loss}')
+        #print(f'epoch {epoch} loss: {running_loss}')
 
     return eval(model, test_loader, criterion, mc_dropout_iterations, device=device)
+
+def plot(name: str, metrics: List[float], save_dir: str, **kwargs) -> None:
+    df = pd.DataFrame({name: [item for item in metrics], 'iteration': [i for i in range(1, len(metrics) + 1)]})
+    fig = px.line(df, x='iteration', y=name, title=f'{name} as a Function of Iteration')
+    fig.write_html(Path(Path.home(), save_dir, 'fig.html'))
+    fig.write_image(Path(Path.home(), save_dir, 'fig.png'))
 
 
 def main() -> int:
@@ -86,14 +125,13 @@ def main() -> int:
         'num_acquisitions': 1000,
         'acquisition_batch_size': 1,
         'sample_size': 5000,
-        'num_epochs': 300,
         'acq_fn_dropout_iterations': 50,
-        'mc_dropout_iterations': 200,
+        'mc_dropout_iterations': 100,
         'size_train': 75,
         'tau_inv_proportion': 0.15,
         'begin_train_set_size': 75,
         'l2_penalty': 0.025,
-        'save_dir': '~/saved_metrics/'
+        'save_dir': 'saved_metrics/'
     }
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -105,20 +143,9 @@ def main() -> int:
     criterion = MSELoss()
     optimizer = RMSprop(model.parameters(), lr=0.001, weight_decay=configs['l2_penalty']/configs['begin_train_set_size'])
 
-    mse = [] # list to hold metrics
+    mse = active_train(model, optimizer, criterion, X_train, y_train, X_test, y_test, device=device, acquisition_fn=acquisition_functions.random,  **configs) # list to hold metrics
 
-    # first iteration of active learning experiment
-    X_train_data = X_train[:configs['begin_train_set_size']]
-    y_train_data = y_train[:configs['begin_train_set_size']]
-
-    train_dataloader, test_dataloader, num_feats = create_dataloaders(X_train=X_train_data, y_train=y_train_data, X_test=X_test, y_test=y_test, device=device)
-
-    print(active_iteration(model=model, train_loader=train_dataloader, test_loader=test_dataloader, optimizer=optimizer, criterion=criterion, device=device, **configs))
-
-
-    # y_hat = model(torch.from_numpy(X[:10]))
-    # print(criterion(y_hat.squeeze(), torch.from_numpy(y[:10])))
-
+    plot('Mean Square Error', mse, **configs)
 
     return 0
 

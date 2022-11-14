@@ -2,18 +2,19 @@ import argparse
 import sys
 
 from src.models.base_cnn import BaseCNN
+from src.models.dkl import ApproximateDKLRegression
 from src.data.data_loader import get_splits, create_dataloaders
 from src import acquisition_functions
 from src.eval import eval
 
+import torch
+import gpytorch
 from torch.optim import SGD, RMSprop
 from torch.nn import MSELoss
-import torch
 from torch.utils.data import DataLoader
 
-from tqdm import trange
+from tqdm import trange, tqdm
 import plotly.express as px
-import numpy as np
 
 from typing import List
 from pathlib import Path
@@ -31,6 +32,7 @@ def active_train(model_type,
           y_test,
           device,
           acquisition_fn,
+          acquisition_fn_type,
           begin_train_set_size,
           num_acquisitions,
           l2_penalty,
@@ -39,37 +41,116 @@ def active_train(model_type,
     train_pool = [i for i in range(begin_train_set_size)]
     acquisition_pool = [i for i in range(begin_train_set_size, X_train.shape[0])]
     mse = []
-    
-    for round in trange(num_acquisitions):
-        X_train_data = X_train[train_pool]
-        y_train_data = y_train[train_pool]
-        
-        model = model_type().double().to(device)
-        optimizer = optimizer_type(model.parameters(), lr=0.001, weight_decay=l2_penalty/len(train_pool))
-        
-        train_dataloader, test_dataloader, num_feats = create_dataloaders(X_train=X_train_data, y_train=y_train_data, X_test=X_test, y_test=y_test, device=device)
-        new_mse, new_var = active_iteration(model=model, 
-                                            train_loader=train_dataloader, 
-                                            test_loader=test_dataloader, 
-                                            optimizer=optimizer, 
-                                            criterion=criterion, 
-                                            device=device, 
-                                            **kwargs)
-        
-        mse.append(new_mse.item())
 
-        new_points = acquisition_fn(pool_points=acquisition_pool, 
-                                    X_train=X_train, 
-                                    y_train=y_train, 
-                                    model=model, 
-                                    criterion=criterion,
-                                    device=device,
-                                    **kwargs)
+    if 'dkl' in acquisition_fn_type:
+        for round in trange(num_acquisitions):
+            X_train_data = X_train[train_pool]
+            y_train_data = y_train[train_pool]
+            
+            likelihood = gpytorch.likelihoods.GaussianLikelihood().to(device)
+            model = model_type().double().to(device)
+            optimizer = optimizer_type(model.parameters(), lr=0.001, weight_decay=l2_penalty/len(train_pool))
+            optimizer = SGD([
+                {'params': model.feature_extractor.parameters(), 'weight_decay': 1e-4},
+                {'params': model.gp_layer.hyperparameters(), 'lr': 0.001 * 0.01},
+                {'params': model.gp_layer.variational_parameters()},
+                {'params': likelihood.parameters()},
+            ], lr=0.001, momentum=0.9, nesterov=True, weight_decay=0)
+            
+            train_dataloader, test_dataloader, num_feats = create_dataloaders(X_train=X_train_data, y_train=y_train_data, X_test=X_test, y_test=y_test, device=device)
+            # scheduler = MultiStepLR(optimizer, milestones=[0.5 * n_epochs, 0.75 * n_epochs], gamma=0.1)
+            mll = gpytorch.mlls.VariationalELBO(likelihood, model.gp_layer, num_data=len(train_dataloader.dataset))
 
-        for point in new_points:
-            train_pool.append(point)
-            acquisition_pool.remove(point)
+            
+            new_mse, new_var = active_iteration_dkl(model=model, 
+                                                train_loader=train_dataloader, 
+                                                test_loader=test_dataloader, 
+                                                optimizer=optimizer, 
+                                                criterion=criterion,
+                                                likelihood=likelihood,
+                                                mll=mll, 
+                                                device=device, 
+                                                **kwargs)
+            
+            mse.append(new_mse.item())
+
+            new_points = acquisition_fn(pool_points=acquisition_pool, 
+                                        X_train=X_train, 
+                                        y_train=y_train, 
+                                        model=model, 
+                                        criterion=criterion,
+                                        device=device,
+                                        **kwargs)
+
+            for point in new_points:
+                train_pool.append(point)
+                acquisition_pool.remove(point)
+
+    else:
+        for round in trange(num_acquisitions):
+            X_train_data = X_train[train_pool]
+            y_train_data = y_train[train_pool]
+            
+            model = model_type().double().to(device)
+            optimizer = optimizer_type(model.parameters(), lr=0.001, weight_decay=l2_penalty/len(train_pool))
+            
+            train_dataloader, test_dataloader, num_feats = create_dataloaders(X_train=X_train_data, y_train=y_train_data, X_test=X_test, y_test=y_test, device=device)
+            new_mse, new_var = active_iteration(model=model, 
+                                                train_loader=train_dataloader, 
+                                                test_loader=test_dataloader, 
+                                                optimizer=optimizer, 
+                                                criterion=criterion, 
+                                                device=device, 
+                                                **kwargs)
+            
+            mse.append(new_mse.item())
+
+            new_points = acquisition_fn(pool_points=acquisition_pool, 
+                                        X_train=X_train, 
+                                        y_train=y_train, 
+                                        model=model, 
+                                        criterion=criterion,
+                                        device=device,
+                                        **kwargs)
+
+            for point in new_points:
+                train_pool.append(point)
+                acquisition_pool.remove(point)
     return mse
+
+def active_iteration_dkl(model, likelihood, epochs, optimizer, train_loader, test_loader, mll, mc_dropout_iterations, **kwargs):
+    for epoch in range(1, epochs + 1):
+        with gpytorch.settings.use_toeplitz(False):
+            train_dkl(epoch, model, likelihood, optimizer, train_loader, mll)
+            # scheduler.step()
+    return eval_dkl(model, likelihood, test_loader, mc_dropout_iterations)
+
+def train_dkl(epoch, model, likelihood, optimizer, train_loader, mll):
+    model.train()
+    likelihood.train()
+
+    minibatch_iter = tqdm(train_loader, desc=f"(Epoch {epoch}) Minibatch")
+    with gpytorch.settings.num_likelihood_samples(8):
+        for batch in minibatch_iter:
+            examples, labels = batch     
+            optimizer.zero_grad()
+            output = model(examples)
+            loss = -mll(output, )
+            loss.backward()
+            optimizer.step()
+            minibatch_iter.set_postfix(loss=loss.item())
+
+def eval_dkl(model, likelihood, test_loader, mc_dropout_iterations):
+    model.eval()
+    likelihood.eval()
+
+    correct = 0
+    with torch.no_grad(), gpytorch.settings.num_likelihood_samples(mc_dropout_iterations):
+        for data, target in test_loader:
+            preds = likelihood(model(data))  # This gives us 16 samples from the predictive distribution
+    print(preds)
+    print(dir(preds))
+    return preds.mean(), preds.variance()
 
 
 # pass in updated train and test loaders at each iteration
@@ -122,7 +203,7 @@ def main() -> int:
         'begin_train_set_size': 75,
         'l2_penalty': 0.025,
         'save_dir': 'saved_metrics/',
-        'acquisition_fn_type': 'max_variance'
+        'acquisition_fn_type': 'max_variance_dkl'
     }
     
     # get device and data
@@ -130,14 +211,20 @@ def main() -> int:
     X_train, y_train, X_test, y_test = get_splits()
     
     # experiment setup stuff
+    model = BaseCNN
     criterion = MSELoss()
+    
     if configs['acquisition_fn_type'] == 'random':
         acquisition_fn = acquisition_functions.random
     elif configs['acquisition_fn_type'] == 'max_variance':
         acquisition_fn = acquisition_functions.max_variance
+    elif configs['acquisition_fn_type'] == 'max_variance_dkl':
+        acquisition_fn = acquisition_functions.max_variance
+        model = ApproximateDKLRegression
+    
 
     # run active learning experiment
-    mse = active_train(model_type=BaseCNN, 
+    mse = active_train(model_type=model, 
                        optimizer_type=RMSprop, 
                        criterion=criterion, 
                        X_train=X_train, 

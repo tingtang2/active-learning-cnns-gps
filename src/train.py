@@ -1,4 +1,7 @@
 import argparse
+from datetime import date
+
+import logging
 import sys
 
 from src.models.base_cnn import BaseCNN
@@ -106,6 +109,8 @@ def active_train(model_type,
                                                 **kwargs)
             
             mse.append(new_mse.item())
+            print(f'AL iteration: {round + 1}, MSE: {mse[-1]}')
+            logging.info(f'AL iteration: {round + 1}, MSE: {mse[-1]}')
 
             new_points = acquisition_fn(pool_points=acquisition_pool, 
                                         X_train=X_train, 
@@ -192,7 +197,7 @@ def plot(name: str, metrics: List[float], save_dir: str, acquisition_fn_type: st
 
 
 def main() -> int:
-
+    # filename for logging and saved models
     configs = {
         'epochs': 100,
         'batch_size': 128,
@@ -208,6 +213,10 @@ def main() -> int:
         'acquisition_fn_type': 'max_variance',
         'num_repeats': 3
     }
+    filename = f'al-{configs["acquisition_fn_type"]}-{date.today()}'
+
+    logging.basicConfig(level=logging.DEBUG, filename= './' + filename+'.log', filemode='w', format='%(message)s')
+    logging.info(configs)
     
     for iter in range(configs['num_repeats']):
         # get device and data

@@ -201,10 +201,10 @@ def main() -> int:
     configs = {
         'epochs': 100,
         'batch_size': 128,
-        'num_acquisitions': 1000,
+        'num_acquisitions': 600,
         'acquisition_batch_size': 1,
         'pool_sample_size': 5000,
-        'mc_dropout_iterations': 200,
+        'mc_dropout_iterations': 50,
         'size_train': 75,
         'tau_inv_proportion': 0.15,
         'begin_train_set_size': 75,
@@ -215,7 +215,7 @@ def main() -> int:
     }
     filename = f'al-{configs["acquisition_fn_type"]}-{date.today()}'
 
-    logging.basicConfig(level=logging.DEBUG, filename= './' + filename+'.log', filemode='w', format='%(message)s')
+    logging.basicConfig(level=logging.DEBUG, filename= './' + filename+'.log', filemode='a', format='%(message)s')
     logging.info(configs)
     
     for iter in range(configs['num_repeats']):

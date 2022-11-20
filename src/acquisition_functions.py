@@ -1,11 +1,13 @@
 import torch
 import numpy as np
 
+rng = np.random.default_rng(11202022)
+
 from src.eval import eval
 from src.data.data_loader import create_test_dataloader
 
 def random(pool_points: np.ndarray, X_train, y_train, model, device, criterion, batch_size=1, **kwargs) -> np.ndarray:
-    return np.random.choice(pool_points, batch_size)
+    return rng.choice(pool_points, batch_size)
 
 
 def max_variance(pool_points: np.ndarray, 

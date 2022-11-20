@@ -13,6 +13,8 @@ from torch.optim import SGD, RMSprop
 from torch.nn import MSELoss
 from torch.utils.data import DataLoader
 
+torch.manual_seed(11202022)
+
 from tqdm import trange, tqdm
 import plotly.express as px
 
@@ -194,51 +196,53 @@ def main() -> int:
     configs = {
         'epochs': 100,
         'batch_size': 128,
-        'num_acquisitions': 100,
+        'num_acquisitions': 1000,
         'acquisition_batch_size': 1,
         'pool_sample_size': 5000,
-        'mc_dropout_iterations': 10,
+        'mc_dropout_iterations': 200,
         'size_train': 75,
         'tau_inv_proportion': 0.15,
         'begin_train_set_size': 75,
         'l2_penalty': 0.025,
         'save_dir': 'saved_metrics/',
-        'acquisition_fn_type': 'max_variance'
+        'acquisition_fn_type': 'max_variance',
+        'num_repeats': 3
     }
     
-    # get device and data
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    X_train, y_train, X_test, y_test = get_splits()
-    
-    # experiment setup stuff
-    model = BaseCNN
-    criterion = MSELoss()
-    
-    if configs['acquisition_fn_type'] == 'random':
-        acquisition_fn = acquisition_functions.random
-    elif configs['acquisition_fn_type'] == 'max_variance':
-        acquisition_fn = acquisition_functions.max_variance
-    elif configs['acquisition_fn_type'] == 'max_variance_dkl':
-        acquisition_fn = acquisition_functions.max_variance
-        model = ApproximateDKLRegression
-    
+    for iter in range(configs['num_repeats']):
+        # get device and data
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        X_train, y_train, X_test, y_test = get_splits()
+        
+        # experiment setup stuff
+        model = BaseCNN
+        criterion = MSELoss()
+        
+        if configs['acquisition_fn_type'] == 'random':
+            acquisition_fn = acquisition_functions.random
+        elif configs['acquisition_fn_type'] == 'max_variance':
+            acquisition_fn = acquisition_functions.max_variance
+        elif configs['acquisition_fn_type'] == 'max_variance_dkl':
+            acquisition_fn = acquisition_functions.max_variance
+            model = ApproximateDKLRegression
+        
 
-    # run active learning experiment
-    mse = active_train(model_type=model, 
-                       optimizer_type=RMSprop, 
-                       criterion=criterion, 
-                       X_train=X_train, 
-                       y_train=y_train, 
-                       X_test=X_test, 
-                       y_test=y_test, 
-                       device=device, 
-                       acquisition_fn=acquisition_fn,  
-                       **configs) 
+        # run active learning experiment
+        mse = active_train(model_type=model, 
+                        optimizer_type=RMSprop, 
+                        criterion=criterion, 
+                        X_train=X_train, 
+                        y_train=y_train, 
+                        X_test=X_test, 
+                        y_test=y_test, 
+                        device=device, 
+                        acquisition_fn=acquisition_fn,  
+                        **configs) 
 
-    # plot and save
-    plot(name='Mean Square Error', metrics=mse, **configs)
-    with open(Path(Path.home(), configs['save_dir'], f'{configs["acquisition_fn_type"]}.json'), 'w') as f:
-        json.dump(mse, f)
+        # plot and save
+        #plot(name='Mean Square Error', metrics=mse, **configs)
+        with open(Path(Path.home(), configs['save_dir'], f'{configs["acquisition_fn_type"]}_iteration_{iter}.json'), 'w') as f:
+            json.dump(mse, f)
 
     return 0
 

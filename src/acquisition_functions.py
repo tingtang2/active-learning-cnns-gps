@@ -20,7 +20,7 @@ def max_variance(pool_points: np.ndarray,
                  batch_size=1, 
                  **kwargs) -> np.ndarray:
                 
-    pool_sample = np.random.choice(pool_points, pool_sample_size, replace=False)
+    pool_sample = rng.choice(pool_points, pool_sample_size, replace=False)
 
     X_pool_data = X_train[pool_sample]
     y_pool_data = y_train[pool_sample]

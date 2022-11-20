@@ -210,7 +210,7 @@ def main() -> int:
         'begin_train_set_size': 75,
         'l2_penalty': 0.025,
         'save_dir': 'saved_metrics/',
-        'acquisition_fn_type': 'max_variance',
+        'acquisition_fn_type': 'random',
         'num_repeats': 3
     }
     filename = f'al-{configs["acquisition_fn_type"]}-{date.today()}'

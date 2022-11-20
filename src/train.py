@@ -203,7 +203,7 @@ def main() -> int:
         'begin_train_set_size': 75,
         'l2_penalty': 0.025,
         'save_dir': 'saved_metrics/',
-        'acquisition_fn_type': 'max_variance_dkl'
+        'acquisition_fn_type': 'max_variance'
     }
     
     # get device and data

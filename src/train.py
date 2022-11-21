@@ -15,6 +15,7 @@ import gpytorch
 from torch.optim import SGD, RMSprop
 from torch.nn import MSELoss
 from torch.utils.data import DataLoader
+import numpy as np
 
 torch.manual_seed(11202022)
 
@@ -93,10 +94,15 @@ def active_train(model_type,
 
     else:
         for round in trange(num_acquisitions):
-            X_train_data = X_train[train_pool]
-            y_train_data = y_train[train_pool]
+            X_train_data = X_train[train_pool].astype(np.float32)
+            y_train_data = y_train[train_pool].astype(np.float32)
             
-            model = model_type().double().to(device)
+            model = model_type().to(device)
+            # extra insurance
+            for layer in model.children():
+                if hasattr(layer, 'reset_parameters'):
+                    layer.reset_parameters()
+
             optimizer = optimizer_type(model.parameters(), lr=0.001, weight_decay=l2_penalty/len(train_pool))
             
             train_dataloader, test_dataloader, num_feats = create_dataloaders(X_train=X_train_data, y_train=y_train_data, X_test=X_test, y_test=y_test, device=device)
@@ -109,8 +115,7 @@ def active_train(model_type,
                                                 **kwargs)
             
             mse.append(new_mse.item())
-            print(f'AL iteration: {round + 1}, MSE: {mse[-1]}')
-            logging.info(f'AL iteration: {round + 1}, MSE: {mse[-1]}')
+            logging.info(f'AL iteration: {round + 1}, MSE: {mse[-1]}, len train set: {len(train_pool)} len acquisition pool {len(acquisition_pool)}')
 
             new_points = acquisition_fn(pool_points=acquisition_pool, 
                                         X_train=X_train, 
@@ -121,6 +126,7 @@ def active_train(model_type,
                                         **kwargs)
 
             for point in new_points:
+                logging.info(f'index added {point}')
                 train_pool.append(point)
                 acquisition_pool.remove(point)
     return mse
@@ -180,7 +186,7 @@ def active_iteration(model: torch.nn.Module,
         
             predictions = model(examples).reshape(-1)
 
-            loss = criterion(predictions, labels.double())
+            loss = criterion(predictions, labels)
 
             loss.double().backward()
             optimizer.step()
@@ -199,7 +205,7 @@ def plot(name: str, metrics: List[float], save_dir: str, acquisition_fn_type: st
 def main() -> int:
     # filename for logging and saved models
     configs = {
-        'epochs': 100,
+        'epochs': 300,
         'batch_size': 128,
         'num_acquisitions': 600,
         'acquisition_batch_size': 1,
@@ -213,7 +219,7 @@ def main() -> int:
         'acquisition_fn_type': 'random',
         'num_repeats': 3
     }
-    filename = f'al-{configs["acquisition_fn_type"]}-{date.today()}'
+    filename = f'al-{configs["acquisition_fn_type"]}-{date.today()}_test'
 
     logging.basicConfig(level=logging.DEBUG, filename= './' + filename+'.log', filemode='a', format='%(message)s')
     logging.info(configs)

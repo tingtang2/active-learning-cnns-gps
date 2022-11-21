@@ -20,7 +20,7 @@ class BaseCNN(nn.Module):
         self.output = nn.Linear(in_features=MLP_out_dim, out_features=1)
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = x.transpose(1, 2).double()
+        x = x.transpose(1, 2)
         x = self.conv1(x)
         x = nn.functional.relu(x)
         x = self.pool1(x)

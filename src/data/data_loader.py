@@ -42,7 +42,7 @@ def create_dataloaders(X_train, y_train, X_test, y_test, device: torch.device, b
         training and eval.
     '''
     # set up dataset objects
-    train_dataset = FivePSplicingDataset(torch.from_numpy(X_train).to(device), torch.from_numpy(y_train).to(device))
+    train_dataset = FivePSplicingDataset(torch.from_numpy(X_train).float().to(device), torch.from_numpy(y_train).float().to(device))
 
     # set up data loaders
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -57,7 +57,7 @@ def create_test_dataloader(X_test, y_test, device: torch.device, batch_size = No
         training and eval.
     '''
     # set up dataset objects
-    test_dataset = FivePSplicingDataset(torch.from_numpy(X_test).to(device), torch.from_numpy(y_test).to(device))
+    test_dataset = FivePSplicingDataset(torch.from_numpy(X_test).to(device, dtype=torch.float), torch.from_numpy(y_test).to(device, dtype=torch.float))
     
     if not batch_size:
         test_batch_size = len(test_dataset)

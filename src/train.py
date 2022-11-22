@@ -126,7 +126,6 @@ def active_train(model_type,
                                         **kwargs)
 
             for point in new_points:
-                logging.info(f'index added {point}')
                 train_pool.append(point)
                 acquisition_pool.remove(point)
     return mse
@@ -219,7 +218,7 @@ def main() -> int:
         'acquisition_fn_type': 'random',
         'num_repeats': 3
     }
-    filename = f'al-{configs["acquisition_fn_type"]}-{date.today()}_test'
+    filename = f'al-{configs["acquisition_fn_type"]}-{date.today()}'
 
     logging.basicConfig(level=logging.DEBUG, filename= './' + filename+'.log', filemode='a', format='%(message)s')
     logging.info(configs)

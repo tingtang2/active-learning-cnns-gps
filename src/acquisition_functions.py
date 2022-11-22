@@ -9,7 +9,7 @@ from src.data.data_loader import create_test_dataloader
 from typing import List
 
 def random(pool_points: List, X_train, y_train, model, device, criterion, acquisition_batch_size=1, **kwargs) -> np.ndarray:
-    return rng.choice(np.array(pool_points), acquisition_batch_size)
+    return rng.choice(np.array(pool_points), acquisition_batch_size, replace=False)
 
 
 def max_variance(pool_points: np.ndarray, 

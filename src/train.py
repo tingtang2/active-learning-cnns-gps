@@ -41,6 +41,7 @@ def active_train(model_type,
           acquisition_fn_type,
           begin_train_set_size,
           num_acquisitions,
+          acquisition_batch_size,
           l2_penalty,
           **kwargs) -> List[float]:
     
@@ -48,86 +49,41 @@ def active_train(model_type,
     acquisition_pool = [i for i in range(begin_train_set_size, X_train.shape[0])]
     mse = []
 
-    if 'dkl' in acquisition_fn_type:
-        for round in trange(num_acquisitions):
-            X_train_data = X_train[train_pool]
-            y_train_data = y_train[train_pool]
-            
-            likelihood = gpytorch.likelihoods.GaussianLikelihood().to(device)
-            model = model_type().double().to(device)
-            optimizer = optimizer_type(model.parameters(), lr=0.001, weight_decay=l2_penalty/len(train_pool))
-            optimizer = SGD([
-                {'params': model.feature_extractor.parameters(), 'weight_decay': 1e-4},
-                {'params': model.gp_layer.hyperparameters(), 'lr': 0.001 * 0.01},
-                {'params': model.gp_layer.variational_parameters()},
-                {'params': likelihood.parameters()},
-            ], lr=0.001, momentum=0.9, nesterov=True, weight_decay=0)
-            
-            train_dataloader, test_dataloader, num_feats = create_dataloaders(X_train=X_train_data, y_train=y_train_data, X_test=X_test, y_test=y_test, device=device)
-            # scheduler = MultiStepLR(optimizer, milestones=[0.5 * n_epochs, 0.75 * n_epochs], gamma=0.1)
-            mll = gpytorch.mlls.VariationalELBO(likelihood, model.gp_layer, num_data=len(train_dataloader.dataset))
+    for round in trange(int(num_acquisitions/acquisition_batch_size)):
+        X_train_data = X_train[train_pool].astype(np.float32)
+        y_train_data = y_train[train_pool].astype(np.float32)
+        
+        model = model_type().to(device)
+        # extra insurance
+        for layer in model.children():
+            if hasattr(layer, 'reset_parameters'):
+                layer.reset_parameters()
 
-            
-            new_mse, new_var = active_iteration_dkl(model=model, 
-                                                train_loader=train_dataloader, 
-                                                test_loader=test_dataloader, 
-                                                optimizer=optimizer, 
-                                                criterion=criterion,
-                                                likelihood=likelihood,
-                                                mll=mll, 
-                                                device=device, 
-                                                **kwargs)
-            
-            mse.append(new_mse.item())
+        optimizer = optimizer_type(model.parameters(), lr=0.001, weight_decay=l2_penalty/len(train_pool))
+        
+        train_dataloader, test_dataloader, num_feats = create_dataloaders(X_train=X_train_data, y_train=y_train_data, X_test=X_test, y_test=y_test, device=device)
+        new_mse, new_var = active_iteration(model=model, 
+                                            train_loader=train_dataloader, 
+                                            test_loader=test_dataloader, 
+                                            optimizer=optimizer, 
+                                            criterion=criterion, 
+                                            device=device, 
+                                            **kwargs)
+        
+        mse.append(new_mse.item())
+        logging.info(f'AL iteration: {round + 1}, MSE: {mse[-1]}, len train set: {len(train_pool)} len acquisition pool {len(acquisition_pool)}')
 
-            new_points = acquisition_fn(pool_points=acquisition_pool, 
-                                        X_train=X_train, 
-                                        y_train=y_train, 
-                                        model=model, 
-                                        criterion=criterion,
-                                        device=device,
-                                        **kwargs)
+        new_points = acquisition_fn(pool_points=acquisition_pool, 
+                                    X_train=X_train, 
+                                    y_train=y_train, 
+                                    model=model, 
+                                    criterion=criterion,
+                                    device=device,
+                                    **kwargs)
 
-            for point in new_points:
-                train_pool.append(point)
-                acquisition_pool.remove(point)
-
-    else:
-        for round in trange(num_acquisitions):
-            X_train_data = X_train[train_pool].astype(np.float32)
-            y_train_data = y_train[train_pool].astype(np.float32)
-            
-            model = model_type().to(device)
-            # extra insurance
-            for layer in model.children():
-                if hasattr(layer, 'reset_parameters'):
-                    layer.reset_parameters()
-
-            optimizer = optimizer_type(model.parameters(), lr=0.001, weight_decay=l2_penalty/len(train_pool))
-            
-            train_dataloader, test_dataloader, num_feats = create_dataloaders(X_train=X_train_data, y_train=y_train_data, X_test=X_test, y_test=y_test, device=device)
-            new_mse, new_var = active_iteration(model=model, 
-                                                train_loader=train_dataloader, 
-                                                test_loader=test_dataloader, 
-                                                optimizer=optimizer, 
-                                                criterion=criterion, 
-                                                device=device, 
-                                                **kwargs)
-            
-            mse.append(new_mse.item())
-            logging.info(f'AL iteration: {round + 1}, MSE: {mse[-1]}, len train set: {len(train_pool)} len acquisition pool {len(acquisition_pool)}')
-
-            new_points = acquisition_fn(pool_points=acquisition_pool, 
-                                        X_train=X_train, 
-                                        y_train=y_train, 
-                                        model=model, 
-                                        criterion=criterion,
-                                        device=device,
-                                        **kwargs)
-
-            for point in new_points:
-                train_pool.append(point)
-                acquisition_pool.remove(point)
+        for point in new_points:
+            train_pool.append(point)
+            acquisition_pool.remove(point)
     return mse
 
 def active_iteration_dkl(model, likelihood, epochs, optimizer, train_loader, test_loader, mll, mc_dropout_iterations, **kwargs):
@@ -207,18 +163,17 @@ def main() -> int:
         'epochs': 300,
         'batch_size': 128,
         'num_acquisitions': 600,
-        'acquisition_batch_size': 1,
+        'acquisition_batch_size': 4,
         'pool_sample_size': 5000,
         'mc_dropout_iterations': 50,
-        'size_train': 75,
         'tau_inv_proportion': 0.15,
         'begin_train_set_size': 75,
         'l2_penalty': 0.025,
         'save_dir': 'saved_metrics/',
-        'acquisition_fn_type': 'random',
+        'acquisition_fn_type': 'max_variance',
         'num_repeats': 3
     }
-    filename = f'al-{configs["acquisition_fn_type"]}-{date.today()}'
+    filename = f'al-{configs["acquisition_fn_type"]}-{date.today()}-batch_size-f{configs["acquisition_batch_size"]}'
 
     logging.basicConfig(level=logging.DEBUG, filename= './' + filename+'.log', filemode='a', format='%(message)s')
     logging.info(configs)
@@ -255,7 +210,7 @@ def main() -> int:
 
         # plot and save
         #plot(name='Mean Square Error', metrics=mse, **configs)
-        with open(Path(Path.home(), configs['save_dir'], f'{configs["acquisition_fn_type"]}_iteration_{iter}.json'), 'w') as f:
+        with open(Path(Path.home(), configs['save_dir'], f'{configs["acquisition_fn_type"]}_iteration_{iter}-batch_size-{configs["acquisition_batch_size"]}.json'), 'w') as f:
             json.dump(mse, f)
 
     return 0

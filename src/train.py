@@ -28,6 +28,8 @@ from pathlib import Path
 import pandas as pd
 import json
 
+import math
+
 
 def active_train(model_type, 
           optimizer_type, 
@@ -49,7 +51,7 @@ def active_train(model_type,
     acquisition_pool = [i for i in range(begin_train_set_size, X_train.shape[0])]
     mse = []
 
-    for round in trange(int(num_acquisitions/acquisition_batch_size)):
+    for round in trange(math.ceil(num_acquisitions/acquisition_batch_size)):
         X_train_data = X_train[train_pool].astype(np.float32)
         y_train_data = y_train[train_pool].astype(np.float32)
         
@@ -158,22 +160,37 @@ def plot(name: str, metrics: List[float], save_dir: str, acquisition_fn_type: st
 
 
 def main() -> int:
-    # filename for logging and saved models
+    parser = argparse.ArgumentParser(description='Create and run active learning experiments on 5 prime splicing data')
+    parser.add_argument('--epochs', default=50, type=int, help='number of epochs to train')
+    parser.add_argument('--lr', default=12e-4, type=float, help='learning rate for optimizer')
+    parser.add_argument('--bert_embedding', action='store_true', help='use bert to encode')
+    parser.add_argument('--elmo_embedding', action='store_true', help='use elmo to encode')
+    parser.add_argument('--glove_embedding', action='store_true', help='use glove to encode')
+    parser.add_argument('--device', '-d', default=0, type=int, help='ID of GPU to use')
+    parser.add_argument('--cpu', action='store_true', help='use cpu instead of GPU')
+    parser.add_argument('--save_dir', default='./morio-model-runs/', help='path to saved model files')
+    parser.add_argument('--checkpoint_path', default='./morio-model-runs/foo.pt', help='path to model checkpoint')
+    parser.add_argument('-train', action='store_true', help='train model')
+    parser.add_argument('-test', action='store_true', help='test model on dataset')
+
+    # Get the hyperparameters
+    #args = parser.parse_args()
+
     configs = {
         'epochs': 300,
         'batch_size': 128,
         'num_acquisitions': 600,
-        'acquisition_batch_size': 4,
+        'acquisition_batch_size': 128,
         'pool_sample_size': 5000,
         'mc_dropout_iterations': 50,
         'tau_inv_proportion': 0.15,
         'begin_train_set_size': 75,
         'l2_penalty': 0.025,
         'save_dir': 'saved_metrics/',
-        'acquisition_fn_type': 'max_variance',
+        'acquisition_fn_type': 'random',
         'num_repeats': 3
     }
-    filename = f'al-{configs["acquisition_fn_type"]}-{date.today()}-batch_size-f{configs["acquisition_batch_size"]}'
+    filename = f'al-{configs["acquisition_fn_type"]}-{date.today()}-batch_size-{configs["acquisition_batch_size"]}'
 
     logging.basicConfig(level=logging.DEBUG, filename= './' + filename+'.log', filemode='a', format='%(message)s')
     logging.info(configs)

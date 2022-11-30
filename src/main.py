@@ -8,9 +8,9 @@ from torch.nn import MSELoss
 from torch.optim import RMSprop
 
 from src.models.base_cnn import BaseCNN
-from src.trainers.mc_dropout_trainer import MCDropoutRandomTrainer
+from src.trainers.mc_dropout_trainer import MCDropoutRandomTrainer, MCDropoutMaxVarTrainer
 
-arg_model_trainer_map = {'random': (MCDropoutRandomTrainer, BaseCNN)}
+arg_model_trainer_map = {'random': (MCDropoutRandomTrainer, BaseCNN), 'max_variance': (MCDropoutMaxVarTrainer, BaseCNN)}
 arg_optimizer_map = {'rmsprop': RMSprop}
 
 

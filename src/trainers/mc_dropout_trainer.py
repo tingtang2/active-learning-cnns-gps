@@ -129,6 +129,6 @@ class MCDropoutMaxVarTrainer(MCDropoutTrainer):
         y_pool_data = self.y_train[pool_sample]
 
         pool_dataloader = create_test_dataloader(X_pool_data, y_pool_data, self.device)
-        pool_mse, pool_var = eval(model=model, loader=pool_dataloader)
+        pool_mse, pool_var = self.eval(model=model, loader=pool_dataloader)
 
         return pool_sample[torch.argsort(pool_var, descending=True)[:self.acquisition_batch_size].cpu().numpy()]

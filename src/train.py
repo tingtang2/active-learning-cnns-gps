@@ -1,34 +1,31 @@
 import argparse
-from datetime import date
-
 import logging
 import sys
+from datetime import date
 
+import gpytorch
+import numpy as np
+import torch
+from torch.nn import MSELoss
+from torch.optim import SGD, RMSprop
+from torch.utils.data import DataLoader
+
+from src import acquisition_functions
+from src.data.data_loader import create_dataloaders, get_splits
+from src.eval import eval
 from src.models.base_cnn import BaseCNN
 from src.models.dkl import ApproximateDKLRegression
-from src.data.data_loader import get_splits, create_dataloaders
-from src import acquisition_functions
-from src.eval import eval
-
-import torch
-import gpytorch
-from torch.optim import SGD, RMSprop
-from torch.nn import MSELoss
-from torch.utils.data import DataLoader
-import numpy as np
 
 torch.manual_seed(11202022)
 
-from tqdm import trange, tqdm
-import plotly.express as px
-
-from typing import List
+import json
+import math
 from pathlib import Path
+from typing import List
 
 import pandas as pd
-import json
-
-import math
+import plotly.express as px
+from tqdm import tqdm, trange
 
 
 def active_train(model_type, 
@@ -192,7 +189,8 @@ def main() -> int:
     }
     filename = f'al-{configs["acquisition_fn_type"]}-{date.today()}-batch_size-{configs["acquisition_batch_size"]}'
 
-    logging.basicConfig(level=logging.DEBUG, filename= './' + filename+'.log', filemode='a', format='%(message)s')
+    FORMAT = '%(asctime)s;%(levelname)s;%(message)s'
+    logging.basicConfig(level=logging.DEBUG, filename= './' + filename+'.log', filemode='a', format=FORMAT)
     logging.info(configs)
     
     for iter in range(configs['num_repeats']):

@@ -1,5 +1,6 @@
 from torch import nn
 
+
 class SharedDropout(nn.Module):
     r"""
     SharedDropout differs from the vanilla dropout strategy in that the dropout mask is shared across one dimension.
@@ -22,7 +23,7 @@ class SharedDropout(nn.Module):
     """
 
     def __init__(self, p=0.5, batch_first=True):
-        super().__init__()
+        super(SharedDropout).__init__()
 
         self.p = p
         self.batch_first = batch_first
@@ -56,6 +57,7 @@ class SharedDropout(nn.Module):
     def get_mask(x, p):
         return x.new_empty(x.shape).bernoulli_(1 - p) / (1 - p)
 
+
 class MLP(nn.Module):
     r"""
     Applies a linear transformation together with a non-linear activation to the incoming tensor:
@@ -72,7 +74,7 @@ class MLP(nn.Module):
     """
 
     def __init__(self, n_in: int, n_out: int, dropout: float = 0, activation: bool = True):
-        super().__init__()
+        super(MLP, self).__init__()
 
         self.n_in = n_in
         self.n_out = n_out

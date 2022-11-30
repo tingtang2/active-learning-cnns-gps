@@ -1,28 +1,85 @@
-import sys
+import argparse
 import logging
+import sys
 from datetime import date
 
-def main() -> int:
-    configs = {
-        'epochs': 300,
-        'batch_size': 128,
-        'num_acquisitions': 600,
-        'acquisition_batch_size': 128,
-        'pool_sample_size': 5000,
-        'mc_dropout_iterations': 50,
-        'tau_inv_proportion': 0.15,
-        'begin_train_set_size': 75,
-        'l2_penalty': 0.025,
-        'save_dir': 'saved_metrics/',
-        'acquisition_fn_type': 'random',
-        'num_repeats': 3
-    }
-    filename = f'al-{configs["acquisition_fn_type"]}-{date.today()}-batch_size-{configs["acquisition_batch_size"]}'
+import torch
+from torch.nn import MSELoss
+from torch.optim import RMSprop
 
+from src.models.base_cnn import BaseCNN
+from src.trainers.mc_dropout_trainer import MCDropoutRandomTrainer
+
+arg_model_trainer_map = {'random': (MCDropoutRandomTrainer, BaseCNN)}
+arg_optimizer_map = {'rmsprop': RMSprop}
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description='Create and run active learning experiments on 5 prime splicing data')
+    parser.add_argument('--epochs', default=300, type=int, help='number of epochs to train model')
+    parser.add_argument('--device', '-d', default='cuda', type=str, help='cpu or gpu ID to use')
+    parser.add_argument('--batch_size', default=128, type=int, help='mini-batch size used to train model')
+    parser.add_argument('--num_acquisitions',
+                        default=600,
+                        type=int,
+                        help='number of points to acquire per active learning experiment')
+    parser.add_argument('--acquisition_batch_size',
+                        default=1,
+                        type=int,
+                        help='number of points acquired at each active learning iteration')
+    parser.add_argument('--pool_sample_size',
+                        default=5000,
+                        type=int,
+                        help='number of points to sample to represent acquisition pool for max var strategy')
+    parser.add_argument('--mc_dropout_iterations',
+                        default=50,
+                        type=int,
+                        help='number of iterations to sample for mc dropout at inference')
+    parser.add_argument('--tau_inv_proportion', default=0.15, type=float, help='const for DEIMOS strategy')
+    parser.add_argument('--begin_train_set_size',
+                        default=75,
+                        type=int,
+                        help='number of points to start active training experiment on')
+    parser.add_argument('--l2_penalty', default=0.025, type=float, help='l2 penalty to start out with')
+    parser.add_argument('--save_dir', default='active-learning-save/saved_metrics/', help='path to saved metric files')
+    parser.add_argument('--log_save_dir',
+                        default='/home/tingchen/active-learning-save/active-learning-logs/',
+                        help='path to saved log files')
+    parser.add_argument('--acquisition_fn_type', default='random', help='type of acquistion function to use')
+    parser.add_argument('--optimizer', default='rmsprop', help='type of optimizer to use')
+    parser.add_argument('--num_repeats', default=3, type=int, help='number of times to repeat experiment')
+    parser.add_argument('--seed', default=11202022, type=int, help='random seed to be used in numpy and torch')
+
+    args = parser.parse_args()
+    configs = args.__dict__
+
+    # for repeatability
+    torch.manual_seed(configs['seed'])
+
+    # set up logging
+    filename = f'al-{configs["acquisition_fn_type"]}-{date.today()}-batch_size-{configs["acquisition_batch_size"]}'
     FORMAT = '%(asctime)s;%(levelname)s;%(message)s'
-    logging.basicConfig(level=logging.DEBUG, filename= './' + filename+'.log', filemode='a', format=FORMAT)
+    logging.basicConfig(level=logging.DEBUG,
+                        filename=f'{configs["log_save_dir"]}{filename}.log',
+                        filemode='a',
+                        format=FORMAT)
     logging.info(configs)
+
+    # get trainer
+    trainer_type, model_type = arg_model_trainer_map[configs['acquisition_fn_type']]
+    trainer = trainer_type(model_type=model_type,
+                           optimizer_type=arg_optimizer_map[configs['optimizer']],
+                           criterion=MSELoss(),
+                           **configs)
+
+    trainer.load_data()
+
+    # perform experiment n times
+    for iter in range(configs['num_repeats']):
+        trainer.active_train_loop(iter)
+
     return 0
+
 
 if __name__ == '__main__':
     sys.exit(main())

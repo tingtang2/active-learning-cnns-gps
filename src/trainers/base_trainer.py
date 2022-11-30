@@ -6,8 +6,9 @@ from typing import List, Union
 
 import pandas as pd
 import plotly.express as px
+import torch
 
-from src.data import get_splits
+from src.data.data_loader import get_splits
 
 
 class BaseTrainer(ABC):
@@ -17,7 +18,7 @@ class BaseTrainer(ABC):
                  optimizer_type,
                  acquisition_fn_type,
                  criterion,
-                 device,
+                 device: str,
                  save_dir: Union[str,
                                  Path],
                  save_plots: bool = True,
@@ -30,7 +31,7 @@ class BaseTrainer(ABC):
         self.optimizer_type = optimizer_type
         self.acquisition_fn_type = acquisition_fn_type
         self.criterion = criterion
-        self.device = device
+        self.device = torch.device(device)
         self.save_plots = save_plots
         self.save_dir = save_dir
         self.seed = seed
@@ -60,7 +61,7 @@ class BaseTrainer(ABC):
         pass
 
     def save_metrics(self, metrics: List[float], iter: int):
-        save_name = f'{self.acquisition_fn_type}_iteration_{iter}-batch_size-{self.acquisition_batch_size}.json'
+        save_name = f'{self.acquisition_fn_type}_iteration_{iter}-batch_size-{self.acquisition_batch_size}-refactor.json'
         with open(Path(Path.home(), self.save_dir, save_name, 'w')) as f:
             json.dump(metrics, f)
 

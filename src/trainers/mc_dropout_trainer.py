@@ -38,7 +38,7 @@ class MCDropoutTrainer(BaseTrainer):
                                                                               X_test=self.X_test,
                                                                               y_test=self.y_test,
                                                                               device=self.device)
-            new_mse, new_var = self.active_iteration(model=model,
+            new_mse, new_var = self.active_train_iteration(model=model,
                                                      train_loader=train_dataloader,
                                                      test_loader=test_dataloader,
                                                      optimizer=optimizer)
@@ -107,7 +107,7 @@ class MCDropoutTrainer(BaseTrainer):
 class MCDropoutRandomTrainer(MCDropoutTrainer):
 
     def __init__(self, **kwargs):
-        super.__init__(**kwargs)
+        super(MCDropoutRandomTrainer, self).__init__(**kwargs)
 
         self.rng = np.random.default_rng(self.seed)
 
@@ -118,7 +118,7 @@ class MCDropoutRandomTrainer(MCDropoutTrainer):
 class MCDropoutMaxVarTrainer(MCDropoutTrainer):
 
     def __init__(self, **kwargs):
-        super.__init__(**kwargs)
+        super(MCDropoutMaxVarTrainer, self).__init__(**kwargs)
 
         self.rng = np.random.default_rng(self.seed)
 

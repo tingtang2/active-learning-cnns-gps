@@ -1,15 +1,14 @@
 import logging
 import math
+from typing import Tuple
 
 import numpy as np
+import torch
+from torch.utils.data import DataLoader
 from tqdm import trange
 
 from src.data.data_loader import create_dataloaders, create_test_dataloader
 from src.trainers.base_trainer import BaseTrainer
-import torch
-from torch.utils.data import DataLoader
-
-from typing import Tuple
 
 
 class MCDropoutTrainer(BaseTrainer):

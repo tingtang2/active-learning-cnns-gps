@@ -55,7 +55,7 @@ class ExactDKLTrainer(BaseTrainer):
                 f'AL iteration: {round + 1}, MSE: {mse[-1]}, len train set: {len(train_pool)} len acquisition pool {len(acquisition_pool)}'
             )
 
-            new_points = self.acquisition_fn(pool_points=acquisition_pool, model=model)
+            new_points = self.acquisition_fn(pool_points=acquisition_pool, model=model, likelihood=likelihood)
 
             for point in new_points:
                 train_pool.append(point)
@@ -64,7 +64,7 @@ class ExactDKLTrainer(BaseTrainer):
         self.save_metrics(mse, iter)
 
     def active_train_iteration(self, model, optimizer, mll, likelihood, X_train_data, y_train_data):
-        iterator = tqdm(range(self.epochs))
+        iterator = range(self.epochs)
         for i in iterator:
             # Zero backprop gradients
             optimizer.zero_grad()
@@ -74,7 +74,7 @@ class ExactDKLTrainer(BaseTrainer):
             loss = -mll(output, y_train_data)
             loss.backward()
 
-            iterator.set_postfix(loss=loss.item())
+            # iterator.set_postfix(loss=loss.item())
             optimizer.step()
 
         return self.eval(model, likelihood, self.X_test, self.y_test)
@@ -85,11 +85,12 @@ class ExactDKLTrainer(BaseTrainer):
 
         # hacky way to send the correctly batched data w/out gpytorch making a fuss
         X_test = torch.from_numpy(test_X).reshape(-1, 404).float().to(self.device)
+        y_test = torch.from_numpy(test_y).float().to(self.device)
 
         with torch.no_grad(), gpytorch.settings.use_toeplitz(False), gpytorch.settings.fast_pred_var():
             preds = model(X_test)
 
-        return torch.mean((preds.mean - test_y)**2), preds.variance
+        return torch.mean((preds.mean - y_test)**2), preds.variance
 
 
 class ExactDKLMaxVarTrainer(ExactDKLTrainer):

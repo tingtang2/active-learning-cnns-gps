@@ -23,10 +23,6 @@ class MCDropoutTrainer(BaseTrainer):
             y_train_data = self.y_train[train_pool].astype(np.float32)
 
             model = self.model_type().to(self.device)
-            # extra insurance
-            for layer in model.children():
-                if hasattr(layer, 'reset_parameters'):
-                    layer.reset_parameters()
 
             optimizer = self.optimizer_type(model.parameters(),
                                             lr=0.001,

@@ -4,7 +4,11 @@ import torch
 
 class BaseCNN(nn.Module):
 
-    def __init__(self, seq_len: int = 101, dropout_prob: float = 0.15, MLP_out_dim: int = 50) -> None:
+    def __init__(self,
+                 seq_len: int = 101,
+                 dropout_prob: float = 0.15,
+                 MLP_out_dim: int = 50,
+                 output_dim: int = 1) -> None:
         super(BaseCNN, self).__init__()
 
         # configs
@@ -17,7 +21,7 @@ class BaseCNN(nn.Module):
         self.conv2 = nn.Conv1d(in_channels=self.seq_len, out_channels=self.seq_len // 2, kernel_size=4)
         self.pool2 = nn.MaxPool1d(kernel_size=3)
         self.dense = nn.Linear(in_features=450, out_features=MLP_out_dim)
-        self.output = nn.Linear(in_features=MLP_out_dim, out_features=1)
+        self.output = nn.Linear(in_features=MLP_out_dim, out_features=output_dim)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if len(x.size()) < 3:

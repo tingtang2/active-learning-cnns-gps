@@ -73,6 +73,7 @@ class ExactDKLTrainer(BaseTrainer):
             # Calc loss and backprop derivatives
             loss = -mll(output, y_train_data)
             loss.backward()
+
             iterator.set_postfix(loss=loss.item())
             optimizer.step()
 
@@ -91,7 +92,7 @@ class ExactDKLTrainer(BaseTrainer):
         return torch.mean((preds.mean - test_y)**2), preds.variance
 
 
-class ExactDKLMaxVarTrainer(BaseTrainer):
+class ExactDKLMaxVarTrainer(ExactDKLTrainer):
 
     def __init__(self, **kwargs):
         super(ExactDKLMaxVarTrainer, self).__init__(**kwargs)

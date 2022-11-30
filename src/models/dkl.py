@@ -16,7 +16,7 @@ class GPRegressionModel(gpytorch.models.ExactGP):
             gpytorch.kernels.RBFKernel(ard_num_dims=2)),
                                                                      num_dims=2,
                                                                      grid_size=100)
-        self.feature_extractor = BaseCNN()
+        self.feature_extractor = BaseCNN(output_dim=2)
 
         # This module will scale the NN features so that they're nice values
         self.scale_to_bounds = gpytorch.utils.grid.ScaleToBounds(-1., 1.)

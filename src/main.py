@@ -5,13 +5,22 @@ from datetime import date
 
 import torch
 from torch.nn import MSELoss
-from torch.optim import RMSprop
+from torch.optim import RMSprop, AdamW
 
 from src.models.base_cnn import BaseCNN
+from src.models.dkl import GPRegressionModel
 from src.trainers.mc_dropout_trainer import MCDropoutRandomTrainer, MCDropoutMaxVarTrainer
+from src.trainers.exact_dkl_trainer import ExactDKLMaxVarTrainer
 
-arg_model_trainer_map = {'random': (MCDropoutRandomTrainer, BaseCNN), 'max_variance': (MCDropoutMaxVarTrainer, BaseCNN)}
-arg_optimizer_map = {'rmsprop': RMSprop}
+arg_model_trainer_map = {
+    'random': (MCDropoutRandomTrainer,
+               BaseCNN),
+    'max_variance': (MCDropoutMaxVarTrainer,
+                     BaseCNN),
+    'max_variance_dkl': (ExactDKLMaxVarTrainer,
+                         GPRegressionModel)
+}
+arg_optimizer_map = {'rmsprop': RMSprop, 'adamw': AdamW}
 
 
 def main() -> int:

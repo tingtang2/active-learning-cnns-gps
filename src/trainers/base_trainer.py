@@ -62,7 +62,7 @@ class BaseTrainer(ABC):
 
     def save_metrics(self, metrics: List[float], iter: int):
         save_name = f'{self.acquisition_fn_type}_iteration_{iter}-batch_size-{self.acquisition_batch_size}-refactor.json'
-        with open(Path(Path.home(), self.save_dir, save_name, 'w')) as f:
+        with open(Path(Path.home(), self.save_dir, save_name), 'w') as f:
             json.dump(metrics, f)
 
     @staticmethod

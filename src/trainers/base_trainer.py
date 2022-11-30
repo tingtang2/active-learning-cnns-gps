@@ -11,14 +11,17 @@ from src.data import get_splits
 
 
 class BaseTrainer(ABC):
-    def __init__(self, 
+
+    def __init__(self,
                  model_type,
                  optimizer_type,
                  acquisition_fn_type,
                  criterion,
                  device,
-                 save_dir: Union[str, Path],
+                 save_dir: Union[str,
+                                 Path],
                  save_plots: bool = True,
+                 seed: int = 11202022,
                  **kwargs) -> None:
         super().__init__()
 
@@ -29,8 +32,8 @@ class BaseTrainer(ABC):
         self.criterion = criterion
         self.device = device
         self.save_plots = save_plots
-        self.save_dir =  save_dir
-        self.mse = None
+        self.save_dir = save_dir
+        self.seed = seed
 
         # extra configs in form of kwargs
         for key, item in kwargs.items():
@@ -39,19 +42,23 @@ class BaseTrainer(ABC):
     # TODO: add additional dataset functionality
     def load_data(self) -> None:
         self.X_train, self.y_train, self.X_test, self.y_test = get_splits()
-    
+
     @abstractmethod
     def active_train_loop(self):
         pass
-    
+
     @abstractmethod
     def active_train_iteration(self):
         pass
-    
+
+    @abstractmethod
+    def acquisition_fn(self):
+        pass
+
     @abstractmethod
     def eval(self):
         pass
-    
+
     def save_metrics(self, metrics: List[float], iter: int):
         save_name = f'{self.acquisition_fn_type}_iteration_{iter}-batch_size-{self.acquisition_batch_size}.json'
         with open(Path(Path.home(), self.save_dir, save_name, 'w')) as f:

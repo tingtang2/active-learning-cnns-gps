@@ -73,7 +73,7 @@ class MCDropoutTrainer(BaseTrainer):
 
                 running_loss += loss.item()
 
-        return self.eval(model, test_loader)
+        return self.eval(model, test_loader, self.test_dropout_iterations)
 
     def _enable_dropout(self, model):
         """ Function to enable the dropout layers during test-time """
@@ -81,15 +81,15 @@ class MCDropoutTrainer(BaseTrainer):
             if m.__class__.__name__.startswith('Dropout'):
                 m.train()
 
-    def eval(self, model, loader: DataLoader) -> Tuple[torch.Tensor, torch.Tensor]:
+    def eval(self, model, loader: DataLoader, mc_dropout_iterations: int) -> Tuple[torch.Tensor, torch.Tensor]:
         model.eval()
         self._enable_dropout(model)
 
-        predictions = torch.empty((self.mc_dropout_iterations, loader.dataset.sequences.size(0))).to(self.device)
+        predictions = torch.empty((mc_dropout_iterations, loader.dataset.sequences.size(0))).to(self.device)
         full_labels: torch.Tensor = loader.dataset.proportions
 
         with torch.no_grad():
-            for i in range(self.mc_dropout_iterations):
+            for i in range(mc_dropout_iterations):
                 for j, batch in enumerate(loader):
                     examples, labels = batch
 
@@ -124,7 +124,7 @@ class MCDropoutMaxVarTrainer(MCDropoutTrainer):
         y_pool_data = self.y_train[pool_sample]
 
         pool_dataloader = create_test_dataloader(X_pool_data, y_pool_data, self.device)
-        pool_mse, pool_var = self.eval(model=model, loader=pool_dataloader)
+        pool_mse, pool_var = self.eval(model=model, loader=pool_dataloader, mc_dropout_iterations=self.acquisition_dropout_iterations)
 
         return pool_sample[torch.argsort(pool_var, descending=True)[:self.acquisition_batch_size].cpu().numpy()]
 
@@ -147,12 +147,12 @@ class MCDropoutDEIMOSTrainer(MCDropoutTrainer):
         # ratio of sampled points that are within the pool
         pool_sample_ratio = len(sample_indices[sample_indices >= len(train_points)]) / self.pool_sample_size
         train_sample_size = len(sample_indices[sample_indices < len(train_points)])
-        
+
         # get relative number of training points selected with respect to pool sample size
         sample_indices_train = (sample_indices[sample_indices < len(train_points)])[0:int(train_sample_size //
                                                                                           pool_sample_ratio)]
         sample_indices_pool = (sample_indices[sample_indices >= len(train_points)])[0:self.pool_sample_size]
-        
+
         X_ei_train_data = self.X_train[train_points][sample_indices_train]
         X_ei_pool_data = np.concatenate((self.X_train[train_points], self.X_train[pool_points]))[sample_indices_pool]
 
@@ -205,7 +205,7 @@ class MCDropoutDEIMOSTrainer(MCDropoutTrainer):
         while last_point_ind < len(X_train_sample) + len(X_cand):
             if last_point_ind + 2000 < len(X_train_sample) + len(X_cand):
                 forward_pass_chunk = forward_pass_input[last_point_ind:last_point_ind + 2000]
-                forward_pass_output[last_point_ind:last_point_ind + 2000] = fixed_mask_forward_pass(
+                forward_pass_output[last_point_ind:last_point_ind + 2000] = self._fixed_mask_forward_pass(
                     model,
                     forward_pass_chunk,
                     num_masks,
@@ -214,16 +214,80 @@ class MCDropoutDEIMOSTrainer(MCDropoutTrainer):
                     dense_masks).T
             else:
                 forward_pass_chunk = forward_pass_input[last_point_ind:]
-                forward_pass_output[last_point_ind:] = fixed_mask_forward_pass(model,
-                                                                               forward_pass_chunk,
-                                                                               num_masks,
-                                                                               dropout_prob,
-                                                                               conv_masks,
-                                                                               dense_masks).T
+                forward_pass_output[last_point_ind:] = self._fixed_mask_forward_pass(
+                    model,
+                    forward_pass_chunk,
+                    num_masks,
+                    dropout_prob,
+                    conv_masks,
+                    dense_masks).T
             last_point_ind += 2000
         output_covariance = np.cov(forward_pass_output)
         print('num training: ' + str(len(X_train_sample)) + ', num cand: ' + str(len(X_cand)))
         print('Tau Inverse Value: ' + str(tau_inverse))
         #Var(Y_{sample}) = Var(\hat{Y}_{sample}) + tau^{-1} I
         final_output_covariance = output_covariance + (tau_inverse * np.identity(output_covariance.shape[0]))
-        return ei_acquisition_fn_model_var(final_output_covariance, len(X_cand), len(X_train_sample), batch_size)
+        return self.ei_acquisition_fn_model_var(final_output_covariance, len(X_cand), len(X_train_sample), batch_size)
+
+    def _ei_acquisition_fn_model_var(self, univ_covariance, num_pool_samples, num_training_samples, batch_size):
+        """Given Var(Y_{sample}), applies batch-mode EI active learning to query points
+        #Arguments
+            univ_covariance: Var(Y_{sample})
+            num_pool_samples: number of pool points in D_{sample}
+            num_training_samples: number of training points in D_{sample}
+            batch_size: number of queried points per batch
+        #Returns
+            the indices of queried pool points as they are arranged in univ_covariance
+        """
+        acq_ind = []
+        for acq_num in range(batch_size):
+            all_acq_values = np.zeros(num_pool_samples)
+            for new_pt_ind in range(num_pool_samples):
+                covariance_vector = univ_covariance[num_training_samples + new_pt_ind, :]
+                all_acq_values[new_pt_ind] = np.sum(
+                    np.square(covariance_vector)) / (univ_covariance[num_training_samples + new_pt_ind,
+                                                                     num_training_samples + new_pt_ind])
+            sorted_top_ind = np.flip(np.argsort(all_acq_values))
+            found_new_ind = False
+            top_ind_ctr = -1
+            while (found_new_ind == False):
+                top_ind_ctr += 1
+                new_top_ind = sorted_top_ind[top_ind_ctr]
+                if new_top_ind not in acq_ind:
+                    acq_ind.append(new_top_ind)
+                    found_new_ind = True
+            top_cov_vector = np.expand_dims(univ_covariance[num_training_samples + acq_ind[-1], :], axis=1)
+            univ_covariance = univ_covariance - np.matmul(
+                top_cov_vector,
+                top_cov_vector.T) / univ_covariance[num_training_samples + acq_ind[-1],
+                                                    num_training_samples + acq_ind[-1]]
+        return acq_ind
+
+    def _fixed_mask_forward_pass(self, model, forward_pass_input, num_masks, dropout_prob, conv_masks, dense_masks):
+        """Makes model predictions with J dropout masks that are fixed across points to enable estimation of Var(Y_{sample})
+        Function is specific to the given Keras model.
+        #Arguments
+            model: keras model
+            forward_pass_input: X_{sample}
+            num_masks: J, the number of dropout masks being used in estimation of Var(Y_{sample}) and calculation of the EI acquisition function
+            dropout_prob: dropout probability 
+            conv_masks: first set of dropout masks, applied after second MaxPooling1D layer
+            dense_masks: second set of dropout masks, applied after the first Dense layer
+        #Returns
+            MC dropout predictions across sample points enabling estimation of Var(Y_{sample}), i.e. \hat{Y}_{sample}
+        """
+        # Functions to retrieve output of intermediate layers
+        # Needed for manual implementation of fixed dropout masks
+        # across all data points
+        conv = K.function([model.layers[0].input, K.learning_phase()], [model.layers[4].output])
+
+        dense_1 = K.function([model.layers[6].input, K.learning_phase()], [model.layers[7].output])
+
+        dense_2 = K.function([model.layers[9].input, K.learning_phase()], [model.layers[9].output])
+
+        conv_output = np.array(conv((forward_pass_input, 1)))
+        dense_1_input = apply_dropout_masks(conv_output, conv_masks)
+        dense_1_output = multi_mask_predict(dense_1, dense_1_input)
+        dense_2_input = apply_dropout_masks(dense_1_output, dense_masks)
+        dense_2_output = np.squeeze(multi_mask_predict(dense_2, dense_2_input))
+        return dense_2_output

@@ -40,10 +40,14 @@ def main() -> int:
                         default=5000,
                         type=int,
                         help='number of points to sample to represent acquisition pool for max var strategy')
-    parser.add_argument('--mc_dropout_iterations',
+    parser.add_argument('--acquisition_dropout_iterations',
                         default=50,
                         type=int,
-                        help='number of iterations to sample for mc dropout at inference')
+                        help='number of iterations to sample for mc dropout at inference during acquisition phase')
+    parser.add_argument('--test_dropout_iterations',
+                        default=200,
+                        type=int,
+                        help='number of iterations to sample for mc dropout at inference during test phase')
     parser.add_argument('--tau_inv_proportion', default=0.15, type=float, help='const for DEIMOS strategy')
     parser.add_argument('--begin_train_set_size',
                         default=75,

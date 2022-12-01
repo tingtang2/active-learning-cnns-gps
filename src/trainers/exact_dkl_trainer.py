@@ -67,6 +67,8 @@ class ExactDKLTrainer(BaseTrainer):
         self.save_metrics(mse, iter)
 
     def active_train_iteration(self, model, optimizer, mll, likelihood, X_train_data, y_train_data):
+        model.train()
+        likelihood.train()
         iterator = range(self.epochs)
         for i in iterator:
             # Zero backprop gradients

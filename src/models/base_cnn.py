@@ -23,6 +23,9 @@ class BaseCNN(nn.Module):
         self.dense = nn.Linear(in_features=450, out_features=MLP_out_dim)
         self.output = nn.Linear(in_features=MLP_out_dim, out_features=output_dim)
 
+        # easy turning on and off of dropout
+        self.dropout = nn.Dropout(p=self.dropout_prob)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         if len(x.size()) < 3:
             x = x.reshape(-1, 101, 4)
@@ -35,12 +38,12 @@ class BaseCNN(nn.Module):
         x = self.conv2(x)
         x = nn.functional.relu(x)
         x = self.pool2(x)
-        x = nn.functional.dropout(x, p=self.dropout_prob)
+        x = self.dropout(x)
 
         x = x.reshape((x.size(0), -1))
         x = self.dense(x)
         x = nn.functional.relu(x)
-        x = nn.functional.dropout(x, p=self.dropout_prob)
+        x = self.dropout(x)
 
         x = self.output(x)
 

@@ -48,7 +48,8 @@ def main() -> int:
                         default=200,
                         type=int,
                         help='number of iterations to sample for mc dropout at inference during test phase')
-    parser.add_argument('--tau_inv_proportion', default=0.15, type=float, help='const for DEIMOS strategy')
+    parser.add_argument('--tau_inverse', default=0.15, type=float, help='const for DEIMOS strategy')
+    parser.add_argument('--dropout_prob', default=0.15, type=float, help='probability for dropout before dense layers')
     parser.add_argument('--begin_train_set_size',
                         default=75,
                         type=int,

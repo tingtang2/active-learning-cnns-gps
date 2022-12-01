@@ -26,7 +26,10 @@ class ExactDKLTrainer(BaseTrainer):
                                                                                                      self.device)
             y_train_data = torch.from_numpy(self.y_train[train_pool].astype(np.float32)).float().to(self.device)
             likelihood = GaussianLikelihood().to(self.device)
-            model = GPRegressionModel(X_train_data, y_train_data, likelihood).to(self.device)
+            model = GPRegressionModel(X_train_data,
+                                      y_train_data,
+                                      likelihood,
+                                      dropout_prob=self.dropout_prob).to(self.device)
 
             # "Loss" for GPs - the marginal log likelihood
             mll = ExactMarginalLogLikelihood(likelihood, model)

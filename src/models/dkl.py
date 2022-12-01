@@ -9,14 +9,14 @@ from src.models.base_cnn import BaseCNN
 
 class GPRegressionModel(gpytorch.models.ExactGP):
 
-    def __init__(self, train_x, train_y, likelihood):
+    def __init__(self, train_x, train_y, likelihood, dropout_prob):
         super(GPRegressionModel, self).__init__(train_x, train_y, likelihood)
         self.mean_module = gpytorch.means.ConstantMean()
         self.covar_module = gpytorch.kernels.GridInterpolationKernel(gpytorch.kernels.ScaleKernel(
             gpytorch.kernels.RBFKernel(ard_num_dims=2)),
                                                                      num_dims=2,
                                                                      grid_size=100)
-        self.feature_extractor = BaseCNN(output_dim=2)
+        self.feature_extractor = BaseCNN(dropout_prob=dropout_prob, output_dim=2)
 
         # This module will scale the NN features so that they're nice values
         self.scale_to_bounds = gpytorch.utils.grid.ScaleToBounds(-1., 1.)

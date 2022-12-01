@@ -26,7 +26,7 @@ class BaseCNN(nn.Module):
         # easy turning on and off of dropout
         self.dropout = nn.Dropout(p=self.dropout_prob)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, fixed_mask: torch.Tensor = None) -> torch.Tensor:
         if len(x.size()) < 3:
             x = x.reshape(-1, 101, 4)
 

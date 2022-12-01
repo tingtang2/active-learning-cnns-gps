@@ -43,7 +43,7 @@ class MCDropoutTrainer(BaseTrainer):
                 f'AL iteration: {round + 1}, MSE: {mse[-1]}, len train set: {len(train_pool)} len acquisition pool {len(acquisition_pool)}'
             )
 
-            new_points = self.acquisition_fn(pool_points=acquisition_pool, model=model)
+            new_points = self.acquisition_fn(pool_points=acquisition_pool, train_points=train_pool, model=model)
 
             for point in new_points:
                 train_pool.append(point)
@@ -157,7 +157,7 @@ class MCDropoutDEIMOSTrainer(MCDropoutTrainer):
         X_ei_pool_data = np.concatenate((self.X_train[train_points], self.X_train[pool_points]))[sample_indices_pool]
 
         # Running EI acquisition
-        acq_fn_results = self._get_acquisition_fn(model, X_ei_train_data, X_ei_pool_data, dropout_prob)
+        acq_fn_results = self._get_acquisition_fn(model, X_ei_train_data, X_ei_pool_data)
         acq_fn_ind = acq_fn_results
         acq_ind_ind = np.subtract(sample_indices_pool[acq_fn_ind], len(train_points))
         acq_ind = np.array(pool_points)[acq_ind_ind]
@@ -205,7 +205,7 @@ class MCDropoutDEIMOSTrainer(MCDropoutTrainer):
                     model,
                     forward_pass_chunk,
                     num_masks,
-                    dropout_prob,
+                    self.dropout_prob,
                     conv_masks,
                     dense_masks).T
             else:
@@ -214,7 +214,7 @@ class MCDropoutDEIMOSTrainer(MCDropoutTrainer):
                     model,
                     forward_pass_chunk,
                     num_masks,
-                    dropout_prob,
+                    self.dropout_prob,
                     conv_masks,
                     dense_masks).T
             last_point_ind += 2000

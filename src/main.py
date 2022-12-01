@@ -60,7 +60,7 @@ def main() -> int:
                         default='/home/tingchen/active-learning-save/active-learning-logs/',
                         help='path to saved log files')
     parser.add_argument('--acquisition_fn_type', default='random', help='type of acquistion function to use')
-    parser.add_argument('--optimizer', default='rmsprop', help='type of optimizer to use')
+    parser.add_argument('--optimizer', default='adamw', help='type of optimizer to use')
     parser.add_argument('--num_repeats', default=3, type=int, help='number of times to repeat experiment')
     parser.add_argument('--seed', default=11202022, type=int, help='random seed to be used in numpy and torch')
 

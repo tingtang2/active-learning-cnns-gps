@@ -96,7 +96,7 @@ class ExactDKLTrainer(BaseTrainer):
         y_test = torch.from_numpy(test_y).float().to(self.device)
 
         with torch.no_grad(), gpytorch.settings.use_toeplitz(False), gpytorch.settings.fast_pred_var():
-            preds = likelihood(model(X_test))
+            preds = model(X_test)
 
         return torch.mean((preds.mean - y_test)**2), preds.variance
 

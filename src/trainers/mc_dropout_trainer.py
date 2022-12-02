@@ -159,7 +159,7 @@ class MCDropoutDEIMOSTrainer(MCDropoutTrainer):
         # Running EI acquisition
         acq_fn_results = self._get_acquisition_fn(model, X_ei_train_data, X_ei_pool_data)
         acq_fn_ind = acq_fn_results
-        acq_ind_ind = np.subtract(sample_indices_pool[acq_fn_ind], len(train_points))
+        acq_ind_ind = np.subtract(sample_indices_pool[acq_fn_ind], len(train_points))    # get correct index
         acq_ind = np.array(pool_points)[acq_ind_ind]
         return acq_ind
 
@@ -228,41 +228,50 @@ class MCDropoutDEIMOSTrainer(MCDropoutTrainer):
 
     def _ei_acquisition_fn_model_var(self, univ_covariance, num_pool_samples, num_training_samples):
         """Given Var(Y_{sample}), applies batch-mode EI active learning to query points
-        #Arguments
+
+        CURRENTLY TURNING OFF BATCH MODE FOR COMPUTATIONAL REASONS
+
+        # Arguments
             univ_covariance: Var(Y_{sample})
             num_pool_samples: number of pool points in D_{sample}
             num_training_samples: number of training points in D_{sample}
             batch_size: number of queried points per batch
-        #Returns
+        # Returns
             the indices of queried pool points as they are arranged in univ_covariance
         """
-        acq_ind = []
-        for acq_num in range(self.acquisition_batch_size):
-            all_acq_values = np.zeros(num_pool_samples)
 
-            for new_pt_ind in range(num_pool_samples):
-                covariance_vector = univ_covariance[num_training_samples + new_pt_ind, :]
-                all_acq_values[new_pt_ind] = np.sum(
-                    np.square(covariance_vector)) / (univ_covariance[num_training_samples + new_pt_ind,
-                                                                     num_training_samples + new_pt_ind])
+        # acq_ind = []
+        # for acq_num in range(self.acquisition_batch_size):
+        all_acq_values = np.zeros(num_pool_samples)
 
-            sorted_top_ind = np.flip(np.argsort(all_acq_values))
-            found_new_ind = False
-            top_ind_ctr = -1
-            while (found_new_ind == False):
-                top_ind_ctr += 1
-                new_top_ind = sorted_top_ind[top_ind_ctr]
-                if new_top_ind not in acq_ind:
-                    acq_ind.append(new_top_ind)
-                    found_new_ind = True
+        for new_pt_ind in range(num_pool_samples):
+            # Cov_q(Y^hat_samp (theta), y^hat_new (theta) )
+            covariance_vector = univ_covariance[num_training_samples + new_pt_ind, :]
 
-            top_cov_vector = np.expand_dims(univ_covariance[num_training_samples + acq_ind[-1], :], axis=1)
-            univ_covariance = univ_covariance - np.matmul(
-                top_cov_vector,
-                top_cov_vector.T) / univ_covariance[num_training_samples + acq_ind[-1],
-                                                    num_training_samples + acq_ind[-1]]
+            # sum of the square values equals the trace of the covariance
+            all_acq_values[new_pt_ind] = np.sum(
+                np.square(covariance_vector)) / (univ_covariance[num_training_samples + new_pt_ind,
+                                                                 num_training_samples + new_pt_ind])
 
-        return acq_ind
+        # sorted_top_ind = np.flip(np.argsort(all_acq_values))
+        return np.argsort(all_acq_values)[-1]
+
+        # found_new_ind = False
+        # top_ind_ctr = -1
+        # while (found_new_ind == False):
+        #     top_ind_ctr += 1
+        #     new_top_ind = sorted_top_ind[top_ind_ctr]
+        #     if new_top_ind not in acq_ind:
+        #         acq_ind.append(new_top_ind)
+        #         found_new_ind = True
+
+        # top_cov_vector = np.expand_dims(univ_covariance[num_training_samples + acq_ind[-1], :], axis=1)
+        # univ_covariance = univ_covariance - np.matmul(
+        #     top_cov_vector,
+        #     top_cov_vector.T) / univ_covariance[num_training_samples + acq_ind[-1],
+        #                                         num_training_samples + acq_ind[-1]]
+
+        # return acq_ind
 
     def _fixed_mask_forward_pass(self, model, forward_pass_input, conv_masks, dense_masks):
         """Makes model predictions with J dropout masks that are fixed across points to enable estimation of Var(Y_{sample})
@@ -280,15 +289,16 @@ class MCDropoutDEIMOSTrainer(MCDropoutTrainer):
         # Functions to retrieve output of intermediate layers
         # Needed for manual implementation of fixed dropout masks
         # across all data points
-        conv = K.function([model.layers[0].input, K.learning_phase()], [model.layers[4].output])
+        # conv = K.function([model.layers[0].input, K.learning_phase()], [model.layers[4].output])
 
-        dense_1 = K.function([model.layers[6].input, K.learning_phase()], [model.layers[7].output])
+        # dense_1 = K.function([model.layers[6].input, K.learning_phase()], [model.layers[7].output])
 
-        dense_2 = K.function([model.layers[9].input, K.learning_phase()], [model.layers[9].output])
+        # dense_2 = K.function([model.layers[9].input, K.learning_phase()], [model.layers[9].output])
 
-        conv_output = np.array(conv((forward_pass_input, 1)))
-        dense_1_input = apply_dropout_masks(conv_output, conv_masks)
-        dense_1_output = multi_mask_predict(dense_1, dense_1_input)
-        dense_2_input = apply_dropout_masks(dense_1_output, dense_masks)
-        dense_2_output = np.squeeze(multi_mask_predict(dense_2, dense_2_input))
+        # conv_output = np.array(conv((forward_pass_input, 1)))
+        # dense_1_input = apply_dropout_masks(conv_output, conv_masks)
+        # dense_1_output = multi_mask_predict(dense_1, dense_1_input)
+        # dense_2_input = apply_dropout_masks(dense_1_output, dense_masks)
+        # dense_2_output = np.squeeze(multi_mask_predict(dense_2, dense_2_input))
+        dense_2_output = None    # just to get rid of warnings for now
         return dense_2_output

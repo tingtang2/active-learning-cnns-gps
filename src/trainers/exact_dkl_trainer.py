@@ -126,6 +126,19 @@ class ExactDKLDEIMOSTrainer(ExactDKLTrainer):
 
         self.rng = np.random.default_rng(self.seed)
 
+    def eval_for_covar(self, model, likelihood, test_X):
+        model.eval()
+        likelihood.eval()
+
+        # hacky way to send the correctly batched data w/out gpytorch making a fuss
+        X_test = torch.from_numpy(test_X).reshape(-1, 404).float().to(self.device)
+
+        with torch.no_grad(), gpytorch.settings.use_toeplitz(False), gpytorch.settings.fast_pred_var(), gpytorch.settings.max_root_decomposition_size(20):
+            preds = likelihood(model(X_test))
+            fast_covar = preds.covariance_matrix
+
+        return fast_covar
+
     def acquisition_fn(self, pool_points, train_points, model, likelihood) -> np.ndarray:
         # TODO: clean this logic up...
 
@@ -148,12 +161,8 @@ class ExactDKLDEIMOSTrainer(ExactDKLTrainer):
         X_ei_pool_data = np.concatenate((self.X_train[train_points], self.X_train[pool_points]))[sample_indicies_pool]
         X_ei_concat = np.concatenate((X_ei_train_data, X_ei_pool_data), axis=0)
 
-        y_ei_train_data = self.y_train[train_points][sample_indicies_train]
-        y_ei_pool_data = np.concatenate((self.y_train[train_points], self.y_train[pool_points]))[sample_indicies_pool]
-        y_ei_concat = np.concatenate((y_ei_train_data, y_ei_pool_data), axis=0)
-
         # Running EI acquisition
-        pred_mse, pred_var, pred_covar = self.eval(model, likelihood, X_ei_concat, y_ei_concat)
+        pred_covar = self.eval_for_covar(model, likelihood, X_ei_concat)
 
         acq_fn_results = self._run_ei_acquisition(pred_covar.detach().cpu().numpy(),
                                                   len(sample_indicies_pool),

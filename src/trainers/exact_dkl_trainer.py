@@ -1,5 +1,8 @@
+import json
 import logging
 import math
+from pathlib import Path
+from typing import List
 
 import gpytorch
 import numpy as np
@@ -125,6 +128,11 @@ class ExactDKLDEIMOSTrainer(ExactDKLTrainer):
         super(ExactDKLDEIMOSTrainer, self).__init__(**kwargs)
 
         self.rng = np.random.default_rng(self.seed)
+
+    def save_metrics(self, metrics: List[float], iter: int):
+        save_name = f'{self.acquisition_fn_type}_iteration_{iter}-batch_size-{self.acquisition_batch_size}-refactor-num-acquisitions-{self.num_acquisitions}-direct-posterior-max-root-size-{self.max_root_size}.json'
+        with open(Path(Path.home(), self.save_dir, save_name), 'w') as f:
+            json.dump(metrics, f)
 
     def eval_for_covar(self, model, likelihood, test_X):
         model.eval()

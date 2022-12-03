@@ -65,6 +65,10 @@ def main() -> int:
     parser.add_argument('--optimizer', default='adamw', help='type of optimizer to use')
     parser.add_argument('--num_repeats', default=3, type=int, help='number of times to repeat experiment')
     parser.add_argument('--seed', default=11202022, type=int, help='random seed to be used in numpy and torch')
+    parser.add_argument('--max_root_size',
+                        default=20,
+                        type=int,
+                        help='max root decomposition size for predictive covariance in DEIMOS exact DKL method')
 
     args = parser.parse_args()
     configs = args.__dict__

@@ -1,5 +1,8 @@
+import json
 import logging
 import math
+from pathlib import Path
+from typing import List
 
 import gpytorch
 import numpy as np
@@ -126,6 +129,11 @@ class ExactDKLDEIMOSTrainer(ExactDKLTrainer):
 
         self.rng = np.random.default_rng(self.seed)
 
+    def save_metrics(self, metrics: List[float], iter: int):
+        save_name = f'{self.acquisition_fn_type}_iteration_{iter}-batch_size-{self.acquisition_batch_size}-refactor-num-acquisitions-{self.num_acquisitions}-direct-posterior-max-root-size-{self.max_root_size}.json'
+        with open(Path(Path.home(), self.save_dir, save_name), 'w') as f:
+            json.dump(metrics, f)
+
     def eval_for_covar(self, model, likelihood, test_X):
         model.eval()
         likelihood.eval()
@@ -133,7 +141,7 @@ class ExactDKLDEIMOSTrainer(ExactDKLTrainer):
         # hacky way to send the correctly batched data w/out gpytorch making a fuss
         X_test = torch.from_numpy(test_X).reshape(-1, 404).float().to(self.device)
 
-        with torch.no_grad(), gpytorch.settings.use_toeplitz(False), gpytorch.settings.fast_pred_var(), gpytorch.settings.max_root_decomposition_size(20):
+        with torch.no_grad(), gpytorch.settings.use_toeplitz(False), gpytorch.settings.fast_pred_var(), gpytorch.settings.max_root_decomposition_size(self.max_root_size):
             preds = likelihood(model(X_test))
             fast_covar = preds.covariance_matrix
 

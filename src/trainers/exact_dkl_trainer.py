@@ -134,7 +134,7 @@ class ExactDKLDEIMOSTrainer(ExactDKLTrainer):
         X_test = torch.from_numpy(test_X).reshape(-1, 404).float().to(self.device)
 
         with torch.no_grad(), gpytorch.settings.use_toeplitz(False), gpytorch.settings.fast_pred_var(), gpytorch.settings.max_root_decomposition_size(20):
-            preds = likelihood(model(X_test))
+            preds = model(X_test)
             fast_covar = preds.covariance_matrix
 
         return fast_covar

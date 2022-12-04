@@ -99,7 +99,7 @@ class ExactDKLTrainer(BaseTrainer):
         y_test = torch.from_numpy(test_y).float().to(self.device)
 
         with torch.no_grad():
-            preds = model(X_test)
+            preds = likelihood(model(X_test))
 
         return torch.mean((preds.mean - y_test)**2), preds.variance
 
@@ -112,7 +112,7 @@ class ExactDKLMaxVarTrainer(ExactDKLTrainer):
         self.rng = np.random.default_rng(self.seed)
 
     def save_metrics(self, metrics: List[float], iter: int):
-        save_name = f'{self.acquisition_fn_type}_iteration_{iter}-batch_size-{self.acquisition_batch_size}-refactor-num-acquisitions-{self.num_acquisitions}-direct-posterior-exact.json'
+        save_name = f'{self.acquisition_fn_type}_iteration_{iter}-batch_size-{self.acquisition_batch_size}-refactor-num-acquisitions-{self.num_acquisitions}-exact.json'
         with open(Path(Path.home(), self.save_dir, save_name), 'w') as f:
             json.dump(metrics, f)
 
@@ -136,7 +136,7 @@ class ExactDKLDEIMOSTrainer(ExactDKLTrainer):
 
     def save_metrics(self, metrics: List[float], iter: int):
         #save_name = f'{self.acquisition_fn_type}_iteration_{iter}-batch_size-{self.acquisition_batch_size}-refactor-num-acquisitions-{self.num_acquisitions}-direct-posterior-max-root-size-{self.max_root_size}.json'
-        save_name = f'{self.acquisition_fn_type}_iteration_{iter}-batch_size-{self.acquisition_batch_size}-refactor-num-acquisitions-{self.num_acquisitions}-direct-posterior-exact.json'
+        save_name = f'{self.acquisition_fn_type}_iteration_{iter}-batch_size-{self.acquisition_batch_size}-refactor-num-acquisitions-{self.num_acquisitions}-exact.json'
         with open(Path(Path.home(), self.save_dir, save_name), 'w') as f:
             json.dump(metrics, f)
 
@@ -148,7 +148,7 @@ class ExactDKLDEIMOSTrainer(ExactDKLTrainer):
         X_test = torch.from_numpy(test_X).reshape(-1, 404).float().to(self.device)
 
         with torch.no_grad():
-            preds = model(X_test)
+            preds = likelihood(model(X_test))
             fast_covar = preds.covariance_matrix
 
         return fast_covar

@@ -111,6 +111,11 @@ class ExactDKLMaxVarTrainer(ExactDKLTrainer):
 
         self.rng = np.random.default_rng(self.seed)
 
+    def save_metrics(self, metrics: List[float], iter: int):
+        save_name = f'{self.acquisition_fn_type}_iteration_{iter}-batch_size-{self.acquisition_batch_size}-refactor-num-acquisitions-{self.num_acquisitions}-direct-posterior-exact.json'
+        with open(Path(Path.home(), self.save_dir, save_name), 'w') as f:
+            json.dump(metrics, f)
+
     def acquisition_fn(self, pool_points, train_points, model, likelihood) -> np.ndarray:
         pool_sample = self.rng.choice(pool_points, self.pool_sample_size, replace=False)
 

@@ -99,9 +99,25 @@ class ExactDKLTrainer(BaseTrainer):
         y_test = torch.from_numpy(test_y).float().to(self.device)
 
         with torch.no_grad():
-            preds = likelihood(model(X_test))
+            preds = model(X_test)
 
         return torch.mean((preds.mean - y_test)**2), preds.variance
+
+
+class ExactDKLRandomTrainer(ExactDKLTrainer):
+
+    def __init__(self, **kwargs):
+        super(ExactDKLMaxVarTrainer, self).__init__(**kwargs)
+
+        self.rng = np.random.default_rng(self.seed)
+
+    def save_metrics(self, metrics: List[float], iter: int):
+        save_name = f'{self.acquisition_fn_type}_iteration_{iter}-batch_size-{self.acquisition_batch_size}-refactor-num-acquisitions-{self.num_acquisitions}-direct-posterior-exact.json'
+        with open(Path(Path.home(), self.save_dir, save_name), 'w') as f:
+            json.dump(metrics, f)
+
+    def acquisition_fn(self, pool_points, train_points, model, likelihood) -> np.ndarray:
+        return self.rng.choice(np.array(pool_points), self.acquisition_batch_size, replace=False)
 
 
 class ExactDKLMaxVarTrainer(ExactDKLTrainer):

@@ -10,11 +10,13 @@ from torch.optim import RMSprop, AdamW
 from src.models.base_cnn import BaseCNN
 from src.models.dkl import GPRegressionModel
 from src.trainers.mc_dropout_trainer import MCDropoutRandomTrainer, MCDropoutMaxVarTrainer
-from src.trainers.exact_dkl_trainer import ExactDKLMaxVarTrainer, ExactDKLDEIMOSTrainer
+from src.trainers.exact_dkl_trainer import ExactDKLMaxVarTrainer, ExactDKLDEIMOSTrainer, ExactDKLRandomTrainer
 
 arg_model_trainer_map = {
     'random': (MCDropoutRandomTrainer,
                BaseCNN),
+    'random_dkl': (ExactDKLRandomTrainer,
+                   GPRegressionModel),
     'max_variance': (MCDropoutMaxVarTrainer,
                      BaseCNN),
     'max_variance_dkl': (ExactDKLMaxVarTrainer,

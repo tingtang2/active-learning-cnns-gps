@@ -107,7 +107,7 @@ class ExactDKLTrainer(BaseTrainer):
 class ExactDKLRandomTrainer(ExactDKLTrainer):
 
     def __init__(self, **kwargs):
-        super(ExactDKLMaxVarTrainer, self).__init__(**kwargs)
+        super(ExactDKLRandomTrainer, self).__init__(**kwargs)
 
         self.rng = np.random.default_rng(self.seed)
 

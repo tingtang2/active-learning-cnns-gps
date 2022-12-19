@@ -1,0 +1,1 @@
+PATH_TO_DIRECTORY='/home/tingchen/active-learning-cnns-gps'

@@ -1,10 +1,7 @@
 # contains modules for deep kernel learning baselines
-import math
-
 import gpytorch
-import torch
 
-from src.models.base_cnn import BaseCNN
+from models.base_cnn import BaseCNN
 
 
 class GPRegressionModel(gpytorch.models.ExactGP):

@@ -11,8 +11,8 @@ from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.mlls import ExactMarginalLogLikelihood
 from tqdm import tqdm, trange
 
-from src.models.dkl import GPRegressionModel
-from src.trainers.base_trainer import BaseTrainer
+from models.dkl import GPRegressionModel
+from trainers.base_trainer import BaseTrainer
 
 
 class ExactDKLTrainer(BaseTrainer):

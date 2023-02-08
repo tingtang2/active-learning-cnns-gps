@@ -6,8 +6,8 @@ import torch
 from cnn_gp import save_K
 from tqdm import trange
 
-from src.models.infinite_filter import initialize_base_cnn
-from src.trainers.base_trainer import BaseTrainer
+from models.infinite_filter import initialize_base_cnn
+from trainers.base_trainer import BaseTrainer
 
 
 class ConvNetGPTrainer(BaseTrainer):

@@ -8,7 +8,7 @@ import pandas as pd
 import plotly.express as px
 import torch
 
-from src.data.data_loader import get_splits
+from data.data_loader import get_splits
 
 
 class BaseTrainer(ABC):

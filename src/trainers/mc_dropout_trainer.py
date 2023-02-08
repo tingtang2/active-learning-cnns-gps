@@ -7,8 +7,8 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import trange
 
-from src.data.data_loader import create_dataloaders, create_test_dataloader
-from src.trainers.base_trainer import BaseTrainer
+from data.data_loader import create_dataloaders, create_test_dataloader
+from trainers.base_trainer import BaseTrainer
 
 
 class MCDropoutTrainer(BaseTrainer):

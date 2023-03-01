@@ -9,6 +9,8 @@ from pathlib import Path
 from configs import PATH_TO_DIRECTORY
 from data.old_dataset import get_dataset
 
+from sklearn.model_selection import train_test_split
+
 
 class FivePSplicingDataset(Dataset):
     '''
@@ -38,6 +40,19 @@ def get_splits():
     print(f'Train X dimensions: {X_train.shape} Test X dimensions: {X_test.shape}')
 
     return X_train, y_train, X_test, y_test
+
+
+def get_oracle_splits(seed):
+    X, y = get_dataset()
+
+    train_indicies = np.load(Path(PATH_TO_DIRECTORY, 'old_data', 'data_indicies', 'trainindices1.npy'))
+
+    X_not_test, y_not_test = X[train_indicies], y[train_indicies]
+    X_train, X_val, y_train, y_val = train_test_split(X_not_test, y_not_test, test_size=26513, seed=seed)
+
+    print(f'Train X dimensions: {X_train.shape} Val X dimensions: {X_val.shape}')
+
+    return X_train, y_train, X_val, y_val
 
 
 def create_dataloaders(X_train,

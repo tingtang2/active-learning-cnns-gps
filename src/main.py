@@ -59,9 +59,9 @@ def main() -> int:
                         type=int,
                         help='number of points to start active training experiment on')
     parser.add_argument('--l2_penalty', default=0.025, type=float, help='l2 penalty to start out with')
-    parser.add_argument('--save_dir', default='active-learning-save/saved_metrics/', help='path to saved metric files')
+    parser.add_argument('--save_dir', default='/gpfs/commons/home/tchen/al_project/active-learning-save/saved_metrics/', help='path to saved metric files')
     parser.add_argument('--log_save_dir',
-                        default='/gpfs/commons/home/tchen/al_project/active-learning-logs/',
+                        default='/gpfs/commons/home/tchen/al_project/active-learning-save/active-learning-logs/',
                         help='path to saved log files')
     parser.add_argument('--acquisition_fn_type', default='random', help='type of acquistion function to use')
     parser.add_argument('--optimizer', default='adamw', help='type of optimizer to use')

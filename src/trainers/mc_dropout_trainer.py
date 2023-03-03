@@ -160,7 +160,7 @@ class MCDropoutDEIMOSTrainer(MCDropoutTrainer):
         acq_fn_results = self._get_acquisition_fn(model, X_ei_train_data, X_ei_pool_data)
         acq_fn_ind = acq_fn_results
         acq_ind_ind = np.subtract(sample_indices_pool[acq_fn_ind], len(train_points))    # get correct index
-        acq_ind = np.array(pool_points)[acq_ind_ind]
+        acq_ind = pool_points[acq_ind_ind]
         return acq_ind
 
     def _get_acquisition_fn(self, model, X_train_sample, X_cand):

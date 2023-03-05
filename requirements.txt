@@ -5,3 +5,4 @@ tqdm
 gpytorch
 pandas
 plotly
+wandb

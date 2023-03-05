@@ -1,4 +1,4 @@
-from cnn_gp import Sequential, Conv2d, ReLU
+from cnn_gp import Conv2d, ReLU, Sequential
 
 
 def initialize_base_cnn():

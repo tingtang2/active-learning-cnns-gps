@@ -5,12 +5,12 @@ from datetime import date
 
 import torch
 from torch.nn import MSELoss
-from torch.optim import RMSprop, AdamW
+from torch.optim import AdamW, RMSprop
 
 from models.base_cnn import BaseCNN
 from models.dkl import GPRegressionModel
-from trainers.mc_dropout_trainer import MCDropoutRandomTrainer, MCDropoutMaxVarTrainer, MCDropoutDEIMOSTrainer
-from trainers.exact_dkl_trainer import ExactDKLMaxVarTrainer, ExactDKLDEIMOSTrainer, ExactDKLRandomTrainer
+from trainers.exact_dkl_trainer import (ExactDKLDEIMOSTrainer, ExactDKLMaxVarTrainer, ExactDKLRandomTrainer)
+from trainers.mc_dropout_trainer import (MCDropoutDEIMOSTrainer, MCDropoutMaxVarTrainer, MCDropoutRandomTrainer)
 
 arg_model_trainer_map = {
     'random': (MCDropoutRandomTrainer,
@@ -98,10 +98,9 @@ def main() -> int:
                            criterion=MSELoss(),
                            **configs)
 
-    trainer.load_data()
-
     # perform experiment n times
     for iter in range(configs['num_repeats']):
+        trainer.load_data(iter)
         trainer.active_train_loop(iter)
 
     return 0

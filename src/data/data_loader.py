@@ -1,15 +1,16 @@
-from torch.utils.data import Dataset, DataLoader
-from torch import FloatTensor, Tensor
-import torch
+from pathlib import Path
 
 import numpy as np
+import torch
 from numpy import ndarray
-from pathlib import Path
+from sklearn.model_selection import train_test_split
+from torch import Tensor
+from torch.utils.data import DataLoader, Dataset
 
 from configs import PATH_TO_DIRECTORY
 from data.old_dataset import get_dataset
 
-from sklearn.model_selection import train_test_split
+import logging
 
 
 class FivePSplicingDataset(Dataset):
@@ -28,11 +29,15 @@ class FivePSplicingDataset(Dataset):
         return len(self.proportions)
 
 
-def get_splits():
+def get_splits(iter: int = 1):
     X, y = get_dataset()
 
-    train_indicies = np.load(Path(PATH_TO_DIRECTORY, 'old_data', 'data_indicies', 'trainindices1.npy'))
-    test_indicies = np.load(Path(PATH_TO_DIRECTORY, 'old_data', 'data_indicies', 'testindices1.npy'))
+    train_idx_path = Path(PATH_TO_DIRECTORY, 'old_data', 'data_indicies', f'trainindices{iter}.npy')
+    test_idx_path = Path(PATH_TO_DIRECTORY, 'old_data', 'data_indicies', f'testindices{iter}.npy')
+    logging.info(f'train idx path: {train_idx_path}, test idx path: {test_idx_path}')
+
+    train_indicies = np.load(train_idx_path)
+    test_indicies = np.load(test_idx_path)
 
     X_train, y_train = X[train_indicies], y[train_indicies]
     X_test, y_test = X[test_indicies], y[test_indicies]

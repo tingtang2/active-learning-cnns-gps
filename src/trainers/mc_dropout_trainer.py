@@ -218,6 +218,7 @@ class MCDropoutDEIMOSTrainer(MCDropoutTrainer):
                     conv_masks,
                     dense_masks).T
             last_point_ind += 2000
+
         output_covariance = np.cov(forward_pass_output)
         logging.info('num training: ' + str(len(X_train_sample)) + ', num cand: ' + str(len(X_cand)) +
                      'Tau Inverse Value: ' + str(self.tau_inverse))

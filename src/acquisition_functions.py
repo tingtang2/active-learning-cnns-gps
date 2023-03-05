@@ -1,12 +1,13 @@
-import torch
 import numpy as np
+import torch
 
 rng = np.random.default_rng(11202022)
 
-from eval import eval
-from data.data_loader import create_test_dataloader
-
 from typing import List
+
+from eval import eval
+
+from data.data_loader import create_test_dataloader
 
 
 def random(pool_points: List,

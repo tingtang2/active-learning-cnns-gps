@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import numpy as np
@@ -9,8 +10,6 @@ from torch.utils.data import DataLoader, Dataset
 
 from configs import PATH_TO_DIRECTORY
 from data.old_dataset import get_dataset
-
-import logging
 
 
 class FivePSplicingDataset(Dataset):

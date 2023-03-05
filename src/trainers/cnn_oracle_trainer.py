@@ -2,13 +2,13 @@ import logging
 from timeit import default_timer as timer
 from typing import Tuple
 
-from scipy.stats import spearmanr
-
 import numpy as np
 import torch
-from models.base_cnn import BaseCNN
+from scipy.stats import spearmanr
 from torch.utils.data import DataLoader
 from tqdm import trange
+
+from models.base_cnn import BaseCNN
 from trainers.base_trainer import BaseOracleTrainer
 
 

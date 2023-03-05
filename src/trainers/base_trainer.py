@@ -2,11 +2,12 @@
 import json
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Union
+from typing import List, Tuple, Union
 
 import pandas as pd
 import plotly.express as px
 import torch
+from torch.utils.data import DataLoader
 
 from data.data_loader import create_dataloaders, get_oracle_splits, get_splits
 
@@ -88,7 +89,6 @@ class BaseOracleTrainer(ABC):
         super().__init__()
 
         # basic configs every training run needs
-        self.model_type = model_type
         self.optimizer_type = optimizer_type
         self.criterion = criterion
         self.device = torch.device(device)
@@ -101,12 +101,16 @@ class BaseOracleTrainer(ABC):
             setattr(self, key, item)
 
     # TODO: add additional dataset functionality
-    def load_data(self) -> None:
+    def load_data(self) -> Tuple[DataLoader, DataLoader, any]:
         X_train, y_train, X_val, y_val = get_oracle_splits(seed=self.seed)
-        return create_dataloaders(X_train=X_train, y_train=y_train, X_test=X_val, y_test=y_val, device=self.device)
+        self.train_loader, self.val_loader, self.data_dim = create_dataloaders(X_train=X_train, y_train=y_train, X_test=X_val, y_test=y_val, device=self.device)
 
     @abstractmethod
-    def train(self):
+    def run_experiment(self):
+        pass
+
+    @abstractmethod
+    def train_epoch(self):
         pass
 
     @abstractmethod

@@ -32,8 +32,8 @@ class FivePSplicingDataset(Dataset):
 def get_splits(iter: int = 1):
     X, y = get_dataset()
 
-    train_idx_path = Path(PATH_TO_DIRECTORY, 'old_data', 'data_indicies', f'trainindices{iter}.npy')
-    test_idx_path = Path(PATH_TO_DIRECTORY, 'old_data', 'data_indicies', f'testindices{iter}.npy')
+    train_idx_path = Path(PATH_TO_DIRECTORY, 'old_data', 'data_indicies', f'trainindices{iter+1}.npy')
+    test_idx_path = Path(PATH_TO_DIRECTORY, 'old_data', 'data_indicies', f'testindices{iter+1}.npy')
     logging.info(f'train idx path: {train_idx_path}, test idx path: {test_idx_path}')
 
     train_indicies = np.load(train_idx_path)

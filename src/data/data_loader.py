@@ -52,7 +52,7 @@ def get_oracle_splits(seed):
     train_indicies = np.load(Path(PATH_TO_DIRECTORY, 'old_data', 'data_indicies', 'trainindices1.npy'))
 
     X_not_test, y_not_test = X[train_indicies], y[train_indicies]
-    X_train, X_val, y_train, y_val = train_test_split(X_not_test, y_not_test, test_size=26513, seed=seed)
+    X_train, X_val, y_train, y_val = train_test_split(X_not_test, y_not_test, test_size=26513, random_state=seed)
 
     print(f'Train X dimensions: {X_train.shape} Val X dimensions: {X_val.shape}')
 

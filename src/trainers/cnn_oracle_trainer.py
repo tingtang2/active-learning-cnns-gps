@@ -2,6 +2,8 @@ import logging
 from timeit import default_timer as timer
 from typing import Tuple
 
+import wandb
+
 import numpy as np
 import torch
 from scipy.stats import spearmanr
@@ -33,13 +35,23 @@ class CNNOracleTrainer(BaseOracleTrainer):
 
             val_loss, sig_result = self.eval(self.val_loader)
 
-            logging.info((
-                f"Epoch: {epoch}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, Spearman correlation: {sig_result.statistic:.3f}, pvalue: {sig_result.pvalue:.3f}, "
-                f"Epoch time = {(end_time - start_time):.3f}s"))
+            log_string = (
+                f"Epoch: {epoch}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, Spearman correlation: {sig_result.correlation:.3f}, pvalue: {sig_result.pvalue:.3f}, "
+                f"Epoch time = {(end_time - start_time):.3f}s")
+            logging.info(log_string)
+
+            if not self.turn_off_wandb:
+                wandb.log({
+                    'epoch': epoch,
+                    'train loss': train_loss,
+                    'val loss': val_loss,
+                    'val spearman correlation': sig_result.correlation,
+                    'pvalue': sig_result.pvalue,
+                    'epoch time': end_time - start_time
+                })
 
             if val_loss < best_val_loss:
                 self.save_model(self.name)
-                logging.info('saving model')
                 early_stopping_counter = 0
             else:
                 early_stopping_counter += 1

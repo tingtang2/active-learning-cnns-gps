@@ -6,7 +6,7 @@ import wandb
 
 import numpy as np
 import torch
-from scipy.stats import spearmanr
+from scipy.stats import spearmanr, pearsonr
 from torch.utils.data import DataLoader
 from tqdm import trange
 
@@ -36,22 +36,12 @@ class CNNOracleTrainer(BaseOracleTrainer):
             train_loss = self.train_epoch(self.train_loader)
             end_time = timer()
 
-            val_loss, sig_result = self.eval(self.val_loader)
+            val_loss, spearman_res, (pearson_r, _) = self.eval(self.val_loader)
 
             log_string = (
-                f"Epoch: {epoch}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, Spearman correlation: {sig_result.correlation:.3f}, patience:{early_stopping_counter},  "
+                f"Epoch: {epoch}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, spearman correlation: {spearman_res.correlation:.3f}, pearson correlation: {pearson_r:.3f}, patience:{early_stopping_counter},  "
                 f"Epoch time = {(end_time - start_time):.3f}s")
             logging.info(log_string)
-
-            if not self.turn_off_wandb:
-                wandb.log({
-                    'epoch': epoch,
-                    'train loss': train_loss,
-                    'val loss': val_loss,
-                    'val spearman correlation': sig_result.correlation,
-                    'patience': early_stopping_counter,
-                    'epoch time': end_time - start_time
-                })
 
             if val_loss < best_val_loss:
                 self.save_model(self.name)
@@ -59,6 +49,17 @@ class CNNOracleTrainer(BaseOracleTrainer):
                 best_val_loss = val_loss
             else:
                 early_stopping_counter += 1
+
+            if not self.turn_off_wandb:
+                wandb.log({
+                    'epoch': epoch,
+                    'train loss': train_loss,
+                    'val loss': val_loss,
+                    'val spearman correlation': spearman_res.correlation,
+                    'val pearson correlation': pearson_r.correlation,
+                    'patience': early_stopping_counter,
+                    'epoch time': end_time - start_time
+                })
 
             if early_stopping_counter == self.early_stopping_threshold:
                 break
@@ -88,7 +89,7 @@ class CNNOracleTrainer(BaseOracleTrainer):
             # TODO: do plotting
             pass
 
-        return self.criterion(predictions, full_labels.float()), spearmanr(predictions.detach().cpu().numpy(), full_labels.detach().cpu().numpy())
+        return self.criterion(predictions, full_labels.float()), spearmanr(predictions.detach().cpu().numpy(), full_labels.detach().cpu().numpy()), pearsonr(predictions.detach().cpu().numpy(), full_labels.detach().cpu().numpy())
 
     def train_epoch(self, loader: DataLoader):
         self.model.train()

@@ -16,7 +16,7 @@ arg_optimizer_map = {'rmsprop': RMSprop, 'adamw': AdamW}
 
 def main() -> int:
     parser = argparse.ArgumentParser(description='Create and run oracle learning experiments on 5 prime splicing data')
-    parser.add_argument('--epochs', default=300, type=int, help='number of epochs to train model')
+    parser.add_argument('--epochs', default=200, type=int, help='number of epochs to train model')
     parser.add_argument('--device', '-d', default='cuda', type=str, help='cpu or gpu ID to use')
     parser.add_argument('--batch_size', default=128, type=int, help='mini-batch size used to train model')
     parser.add_argument('--dropout_prob', default=0.15, type=float, help='probability for dropout before dense layers')
@@ -34,7 +34,7 @@ def main() -> int:
                         help='path to saved log files')
     parser.add_argument('--model_type', default='cnn', help='type of model to use')
     parser.add_argument('--optimizer', default='adamw', help='type of optimizer to use')
-    parser.add_argument('--num_repeats', default=3, type=int, help='number of times to repeat experiment')
+    parser.add_argument('--num_repeats', default=1, type=int, help='number of times to repeat experiment')
     parser.add_argument('--seed', default=11202022, type=int, help='random seed to be used in numpy and torch')
     parser.add_argument('--turn_off_wandb', action='store_true', help='skip wandb logging')
 

@@ -10,7 +10,7 @@ from scipy.stats import spearmanr
 from torch.utils.data import DataLoader
 from tqdm import trange
 
-from models.base_cnn import BaseCNN
+from models.base_cnn import OracleCNN
 from trainers.base_trainer import BaseOracleTrainer
 
 
@@ -19,8 +19,11 @@ class CNNOracleTrainer(BaseOracleTrainer):
     def __init__(self, **kwargs) -> None:
         super(CNNOracleTrainer, self).__init__(**kwargs)
 
-        self.model = BaseCNN(dropout_prob=self.dropout_prob).to(self.device)
+        self.model = OracleCNN(dropout_prob=self.dropout_prob).to(self.device)
         self.optimizer = self.optimizer_type(self.model.parameters(), lr=self.learning_rate)
+
+        if not self.turn_off_wandb:
+            wandb.watch(self.model, criterion=self.criterion, log='all', log_freq=50)
 
         self.name = 'base_cnn_oracle'
 
@@ -36,7 +39,7 @@ class CNNOracleTrainer(BaseOracleTrainer):
             val_loss, sig_result = self.eval(self.val_loader)
 
             log_string = (
-                f"Epoch: {epoch}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, Spearman correlation: {sig_result.correlation:.3f}, pvalue: {sig_result.pvalue:.3f}, "
+                f"Epoch: {epoch}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, Spearman correlation: {sig_result.correlation:.3f}, patience:{early_stopping_counter},  "
                 f"Epoch time = {(end_time - start_time):.3f}s")
             logging.info(log_string)
 
@@ -46,13 +49,14 @@ class CNNOracleTrainer(BaseOracleTrainer):
                     'train loss': train_loss,
                     'val loss': val_loss,
                     'val spearman correlation': sig_result.correlation,
-                    'pvalue': sig_result.pvalue,
+                    'patience': early_stopping_counter,
                     'epoch time': end_time - start_time
                 })
 
             if val_loss < best_val_loss:
                 self.save_model(self.name)
                 early_stopping_counter = 0
+                best_val_loss = val_loss
             else:
                 early_stopping_counter += 1
 

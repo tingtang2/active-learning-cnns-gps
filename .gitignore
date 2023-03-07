@@ -141,3 +141,6 @@ share/
 etc/
 pip-selfcheck.json
 pyvenv.cfg
+
+# wandb
+wandb/

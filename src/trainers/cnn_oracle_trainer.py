@@ -56,7 +56,7 @@ class CNNOracleTrainer(BaseOracleTrainer):
                     'train loss': train_loss,
                     'val loss': val_loss,
                     'val spearman correlation': spearman_res.correlation,
-                    'val pearson correlation': pearson_r.correlation,
+                    'val pearson correlation': pearson_r,
                     'patience': early_stopping_counter,
                     'epoch time': end_time - start_time
                 })

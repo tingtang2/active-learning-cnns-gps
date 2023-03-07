@@ -23,7 +23,7 @@ class CNNOracleTrainer(BaseOracleTrainer):
         self.optimizer = self.optimizer_type(self.model.parameters(), lr=self.learning_rate)
 
         if not self.turn_off_wandb:
-            wandb.watch(self.model, criterion=self.criterion, log='all', log_freq=50)
+            wandb.watch(self.model, criterion=self.criterion, log='all', log_freq=20, log_graph=True)
 
         self.name = 'base_cnn_oracle'
 

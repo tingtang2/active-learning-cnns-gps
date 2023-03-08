@@ -2,15 +2,13 @@ import logging
 from timeit import default_timer as timer
 from typing import Tuple
 
-import wandb
-
 import numpy as np
 import torch
-from scipy.stats import spearmanr, pearsonr
+import wandb
+from models.base_cnn import OracleCNN
+from scipy.stats import pearsonr, spearmanr
 from torch.utils.data import DataLoader
 from tqdm import trange
-
-from models.base_cnn import OracleCNN
 from trainers.base_trainer import BaseOracleTrainer
 
 

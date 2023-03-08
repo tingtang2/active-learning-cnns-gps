@@ -1,7 +1,6 @@
 from typing import Tuple
 
 import numpy as np
-
 from configs import PATH_TO_DIRECTORY
 
 nuc_arr = ['A', 'C', 'G', 'T']

@@ -5,9 +5,8 @@ rng = np.random.default_rng(11202022)
 
 from typing import List
 
-from eval import eval
-
 from data.data_loader import create_test_dataloader
+from eval import eval
 
 
 def random(pool_points: List,

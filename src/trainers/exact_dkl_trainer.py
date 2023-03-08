@@ -9,9 +9,8 @@ import numpy as np
 import torch
 from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch.mlls import ExactMarginalLogLikelihood
-from tqdm import tqdm, trange
-
 from models.dkl import GPRegressionModel
+from tqdm import tqdm, trange
 from trainers.base_trainer import BaseTrainer
 
 

@@ -53,12 +53,13 @@ class BaseCNN(nn.Module):
 class OracleCNN(nn.Module):
 
     def __init__(self,
-                 num_conv_layers: int = 3,
+                 num_conv_layers: int = 5,
                  conv_kernel_size: int = 4,
                  seq_len: int = 101,
                  dropout_prob: float = 0.15,
                  MLP_out_dim: int = 50,
-                 output_dim: int = 1) -> None:
+                 output_dim: int = 1,
+                 bottleneck: bool = False) -> None:
         super(OracleCNN, self).__init__()
 
         # configs
@@ -70,13 +71,19 @@ class OracleCNN(nn.Module):
         self.conv_layers.append(nn.Conv1d(in_channels=4, out_channels=self.seq_len, kernel_size=conv_kernel_size))
 
         for num in range(num_conv_layers - 1):
-            self.conv_layers.append(
-                nn.Conv1d(in_channels=self.seq_len // (2**num),
-                          out_channels=self.seq_len // (2**(num + 1)),
-                          kernel_size=conv_kernel_size))
+            if bottleneck:
+                self.conv_layers.append(
+                    nn.Conv1d(in_channels=self.seq_len // (2**num),
+                              out_channels=self.seq_len // (2**(num + 1)),
+                              kernel_size=conv_kernel_size))
+            else:
+                self.conv_layers.append(
+                    nn.Conv1d(in_channels=self.seq_len,
+                              out_channels=self.seq_len,
+                              kernel_size=conv_kernel_size))
 
         self.pool = nn.MaxPool1d(kernel_size=3)
-        self.dense = nn.Linear(in_features=50, out_features=MLP_out_dim)
+        self.dense = nn.Linear(in_features=2828, out_features=MLP_out_dim)
         self.output = nn.Linear(in_features=MLP_out_dim, out_features=output_dim)
 
         # easy turning on and off of dropout
@@ -91,8 +98,8 @@ class OracleCNN(nn.Module):
         for conv_layer in self.conv_layers:
             x = conv_layer(x)
             x = nn.functional.relu(x)
-            x = self.pool(x)
 
+        x = self.pool(x)
         x = self.dropout(x)
 
         x = x.reshape((x.size(0), -1))

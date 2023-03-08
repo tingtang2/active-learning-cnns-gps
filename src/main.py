@@ -4,11 +4,10 @@ import sys
 from datetime import date
 
 import torch
-from torch.nn import MSELoss
-from torch.optim import AdamW, RMSprop
-
 from models.base_cnn import BaseCNN
 from models.dkl import GPRegressionModel
+from torch.nn import MSELoss
+from torch.optim import AdamW, RMSprop
 from trainers.exact_dkl_trainer import (ExactDKLDEIMOSTrainer,
                                         ExactDKLMaxVarTrainer,
                                         ExactDKLRandomTrainer)

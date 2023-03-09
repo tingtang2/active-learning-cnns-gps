@@ -7,9 +7,13 @@ import torch
 import wandb
 from torch.nn import MSELoss
 from torch.optim import AdamW, RMSprop
-from trainers.cnn_oracle_trainer import CNNOracleTrainer, ResNetOracleTrainer
+from trainers.cnn_oracle_trainer import CNNOracleTrainer, ResNetOracleTrainer, DeepFactorizedOracleTrainer
 
-arg_model_trainer_map = {'cnn': CNNOracleTrainer, 'resnet': ResNetOracleTrainer}
+arg_model_trainer_map = {
+    'cnn': CNNOracleTrainer,
+    'resnet': ResNetOracleTrainer,
+    'deep_factorized': DeepFactorizedOracleTrainer
+}
 arg_optimizer_map = {'rmsprop': RMSprop, 'adamw': AdamW}
 
 

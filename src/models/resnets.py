@@ -119,11 +119,11 @@ class ResNet(nn.Module):
         self.maxpool1 = nn.MaxPool2d((3, 1))
         self.maxpool2 = nn.MaxPool2d((4, 1))
         self.maxpool3 = nn.MaxPool2d((4, 1))
-        self.fc1 = nn.Linear(400, 100)
-        self.bn4 = nn.BatchNorm1d(100)
-        self.fc2 = nn.Linear(100, 100)
-        self.bn5 = nn.BatchNorm1d(100)
-        self.fc3 = nn.Linear(100, output_dim)
+        self.fc1 = nn.Linear(400, 1000)
+        self.bn4 = nn.BatchNorm1d(1000)
+        self.fc2 = nn.Linear(1000, 1000)
+        self.bn5 = nn.BatchNorm1d(1000)
+        self.fc3 = nn.Linear(1000, output_dim)
         self.flayer = self.final_layer()
 
     def final_layer(self):

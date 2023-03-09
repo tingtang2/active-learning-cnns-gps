@@ -2,10 +2,10 @@ import logging
 from timeit import default_timer as timer
 from typing import Tuple
 
-import numpy as np
 import torch
 import wandb
 from models.base_cnn import OracleCNN
+from models.resnets import ResNet
 from scipy.stats import pearsonr, spearmanr
 from torch.utils.data import DataLoader
 from tqdm import trange
@@ -104,3 +104,17 @@ class CNNOracleTrainer(BaseOracleTrainer):
 
             running_loss += loss.item()
         return running_loss
+
+
+class ResNetOracleTrainer(CNNOracleTrainer):
+
+    def __init__(self, **kwargs) -> None:
+        super(ResNetOracleTrainer, self).__init__(**kwargs)
+
+        self.model = ResNet(dropout_prob=self.dropout_prob).to(self.device)
+        self.optimizer = self.optimizer_type(self.model.parameters(), lr=self.learning_rate)
+
+        if not self.turn_off_wandb:
+            wandb.watch(self.model, criterion=self.criterion, log='all', log_freq=20, log_graph=True)
+
+        self.name = 'resnet_oracle'

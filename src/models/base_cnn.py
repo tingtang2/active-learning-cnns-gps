@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from torch import nn
 
 
@@ -32,17 +33,17 @@ class BaseCNN(nn.Module):
 
         x = x.transpose(1, 2)
         x = self.conv1(x)
-        x = nn.functional.relu(x)
+        x = F.relu(x)
         x = self.pool1(x)
 
         x = self.conv2(x)
-        x = nn.functional.relu(x)
+        x = F.relu(x)
         x = self.pool2(x)
         x = self.dropout(x)
 
         x = x.reshape((x.size(0), -1))
         x = self.dense(x)
-        x = nn.functional.relu(x)
+        x = F.relu(x)
         x = self.dropout(x)
 
         x = self.output(x)
@@ -97,14 +98,14 @@ class OracleCNN(nn.Module):
 
         for conv_layer in self.conv_layers:
             x = conv_layer(x)
-            x = nn.functional.relu(x)
+            x = F.relu(x)
 
         x = self.pool(x)
         x = self.dropout(x)
 
         x = x.reshape((x.size(0), -1))
         x = self.dense(x)
-        x = nn.functional.relu(x)
+        x = F.relu(x)
         x = self.dropout(x)
 
         x = self.output(x)

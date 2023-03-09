@@ -19,7 +19,7 @@ class L1Block(nn.Module):
         out = self.layer(x)
         out += x
         out = F.relu(out)
-        return
+        return out
 
 
 class L2Block(nn.Module):
@@ -86,10 +86,11 @@ class L4Block(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, dropout_prob: float = 0.15, output_dim: int = 1, blocks=[2, 2, 2, 2]):
+    def __init__(self, seq_len: int = 101, dropout_prob: float = 0.15, output_dim: int = 1, blocks=[1, 1, 1, 1]):
         super(ResNet, self).__init__()
 
         self.dropout = dropout_prob
+        self.seq_len = seq_len
 
         self.conv1 = nn.Conv2d(4, 48, (3, 1), stride=(1, 1), padding=(1, 0))
         self.bn1 = nn.BatchNorm2d(48)
@@ -118,11 +119,11 @@ class ResNet(nn.Module):
         self.maxpool1 = nn.MaxPool2d((3, 1))
         self.maxpool2 = nn.MaxPool2d((4, 1))
         self.maxpool3 = nn.MaxPool2d((4, 1))
-        self.fc1 = nn.Linear(4200, 1000)
-        self.bn4 = nn.BatchNorm1d(1000)
-        self.fc2 = nn.Linear(1000, 1000)
-        self.bn5 = nn.BatchNorm1d(1000)
-        self.fc3 = nn.Linear(1000, output_dim)
+        self.fc1 = nn.Linear(400, 100)
+        self.bn4 = nn.BatchNorm1d(100)
+        self.fc2 = nn.Linear(100, 100)
+        self.bn5 = nn.BatchNorm1d(100)
+        self.fc3 = nn.Linear(100, output_dim)
         self.flayer = self.final_layer()
 
     def final_layer(self):
@@ -132,7 +133,7 @@ class ResNet(nn.Module):
 
     def forward(self, s):
         s = s.permute(0, 2, 1).contiguous()    # batch_size x 4 x 1000
-        s = s.view(-1, 4, 1000, 1)    # batch_size x 4 x 1000 x 1 [4 channels]
+        s = s.view(-1, 4, self.seq_len, 1)    # batch_size x 4 x 1000 x 1 [4 channels]
 
         out = self.prelayer(s)
         out = self.layer1(out)
@@ -143,9 +144,9 @@ class ResNet(nn.Module):
         out = self.layer4(out)
         out = self.flayer(out)
         out = self.maxpool3(out)
-        out = out.view(-1, 4200)
+        out = out.view(-1, 400)
         conv_out = out
         out = F.dropout(F.relu(self.bn4(self.fc1(out))), p=self.dropout, training=self.training)    # batch_size x 1000
         out = F.dropout(F.relu(self.bn5(self.fc2(out))), p=self.dropout, training=self.training)    # batch_size x 1000
         out = self.fc3(out)
-        return out, conv_out
+        return out

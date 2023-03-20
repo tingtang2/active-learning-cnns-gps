@@ -12,6 +12,8 @@ from torch.utils.data import DataLoader
 from tqdm import trange
 from trainers.base_trainer import BaseOracleTrainer
 
+from torch.optim.lr_scheduler import ExponentialLR
+
 
 class CNNOracleTrainer(BaseOracleTrainer):
 
@@ -26,6 +28,11 @@ class CNNOracleTrainer(BaseOracleTrainer):
 
         self.name = 'base_cnn_oracle'
 
+        self.use_scheduler = True
+
+        if self.use_scheduler:
+            self.scheduler = ExponentialLR(self.optimizer, gamma=0.9)
+
     def run_experiment(self):
         best_val_loss = 1e+5
         early_stopping_counter = 0
@@ -36,6 +43,9 @@ class CNNOracleTrainer(BaseOracleTrainer):
             end_time = timer()
 
             val_loss, spearman_res, (pearson_r, _) = self.eval(self.val_loader)
+
+            if self.use_scheduler:
+                self.scheduler.step()
 
             log_string = (
                 f"Epoch: {epoch}, Train loss: {train_loss:.3f}, Val loss: {val_loss:.3f}, spearman correlation: {spearman_res.correlation:.3f}, pearson correlation: {pearson_r:.3f}, patience:{early_stopping_counter},  "

@@ -9,6 +9,9 @@ class Generator(nn.Module):
     def __init__(self) -> None:
         super(Generator, self).__init__()
 
+        self.batch_norm = nn.BatchNorm1d()
+        self.batch_size = 10
+
         # generator_model = Model(inputs=[sequence_class_input] + generator_inputs,
         #                         outputs=[
         #                             sequence_class,
@@ -22,8 +25,9 @@ class Generator(nn.Module):
         #                             sampled_onehot_mask
         #                         ] + extra_outputs)
 
-    def forward(random_seed: int):
+    def forward(self, random_seed: int = None):
         # Seed class input for all dense/embedding layers
+        sequence_class_input = torch.ones(self.batch_size)
 
         # Get generated policy pwm logits (non-masked)
 

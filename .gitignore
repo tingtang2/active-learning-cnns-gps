@@ -144,3 +144,6 @@ pyvenv.cfg
 
 # wandb
 wandb/
+
+# saved metrics 
+saved_metrics.tar.gz

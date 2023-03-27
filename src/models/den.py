@@ -12,7 +12,7 @@ class Generator(nn.Module):
     def __init__(self,
                  device: torch.device,
                  latent_dim: int = 100,
-                 batch_size: int = 10,
+                 batch_size: int = 32,
                  seq_length: int = 101,
                  n_classes: int = 1,
                  supply_inputs: bool = False) -> None:
@@ -27,9 +27,39 @@ class Generator(nn.Module):
         self.device = device
 
         # Policy/generator network definition
-        dense_1 = nn.Linear(in_features=self.latent_dim + self.n_classes, out_features=9 * 384)
-        deconv_0 = nn.ConvTranspose2d(384)
-        self.generator_network = nn.ModuleList([dense_1, deconv_0])
+        dense_0 = nn.Linear(in_features=self.latent_dim + self.n_classes, out_features=9 * 384)
+
+        deconv_0 = nn.ConvTranspose2d(in_channels=384, out_channels=256, kernel_size=(7, 1), stride=(2, 1))
+        batch_norm_0 = nn.BatchNorm2d(num_features=256)
+
+        deconv_1 = nn.ConvTranspose2d(in_channels=256, out_channels=192, kernel_size=(8, 1), stride=(2, 1))
+        batch_norm_1 = nn.BatchNorm2d(num_features=192)
+
+        deconv_2 = nn.ConvTranspose2d(in_channels=192, out_channels=128, kernel_size=(7, 1), stride=(2, 1))
+        batch_norm_2 = nn.BatchNorm2d(num_features=128)
+
+        conv_3 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=(8, 1), stride=(1, 1))
+        batch_norm_3 = nn.BatchNorm2d(num_features=128)
+
+        conv_4 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=(8, 1), stride=(1, 1))
+        batch_norm_4 = nn.BatchNorm2d(num_features=64)
+
+        conv_5 = nn.Conv2d(in_channels=64, out_channels=4, kernel_size=(8, 1), stride=(1, 1))
+
+        self.generator_network = nn.ModuleList([
+            dense_0,
+            deconv_0,
+            batch_norm_0,
+            deconv_1,
+            batch_norm_1,
+            deconv_2,
+            batch_norm_2,
+            conv_3,
+            batch_norm_3,
+            conv_4,
+            batch_norm_4,
+            conv_5,
+        ])
 
         # self.batch_norm = nn.BatchNorm1d()
         # generator_model = Model(inputs=[sequence_class_input] + generator_inputs,
@@ -69,17 +99,25 @@ class Generator(nn.Module):
 
         policy_out_1 = seed_input_1
         policy_out_2 = seed_input_2
+
         for i, layer in enumerate(self.generator_network):
             policy_out_1 = layer(policy_out_1)
             policy_out_2 = layer(policy_out_2)
 
             # reshape for 2D ops
             if i == 0:
-                policy_out_1.reshape(9, 1, 384)
-                policy_out_2.reshape(9, 1, 384)
+                policy_out_1 = policy_out_1.reshape(self.batch_size, 384, 9, 1)
+                policy_out_2 = policy_out_2.reshape(self.batch_size, 384, 9, 1)
 
-        return sequence_class, sequence_class_onehots, class_embedding    # , class_embedding
+            if isinstance(layer, nn.BatchNorm2d):
+                policy_out_1 = F.relu(policy_out_1)
+                policy_out_2 = F.relu(policy_out_2)
 
+        # return sequence_class, sequence_class_onehots, class_embedding
+
+        # policy_out_1 = policy_out_1.reshape(self.batch_size, self.seq_length, 4, 1)
+
+        return policy_out_1
         # Initialize Templating and Masking Lambda layer
 
         # Batch Normalize PWM Logits

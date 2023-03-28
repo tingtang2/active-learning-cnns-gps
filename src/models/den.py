@@ -7,24 +7,14 @@ import torch.nn.functional as F
 from torch import nn
 
 
-class Generator(nn.Module):
+class GeneratorNetwork(nn.Module):
 
-    def __init__(self,
-                 device: torch.device,
-                 latent_dim: int = 100,
-                 batch_size: int = 32,
-                 seq_length: int = 101,
-                 n_classes: int = 1,
-                 supply_inputs: bool = False) -> None:
-        super(Generator, self).__init__()
-
+    def __init__(self, latent_dim: int = 100, batch_size: int = 32, seq_length: int = 101, n_classes: int = 1) -> None:
+        super(GeneratorNetwork, self).__init__()
         self.batch_size = batch_size
         self.seq_length = seq_length
         self.n_classes = n_classes
         self.latent_dim = latent_dim
-
-        self.supply_inputs = supply_inputs
-        self.device = device
 
         # Policy/generator network definition
         dense_0 = nn.Linear(in_features=self.latent_dim + self.n_classes, out_features=9 * 384)
@@ -38,13 +28,13 @@ class Generator(nn.Module):
         deconv_2 = nn.ConvTranspose2d(in_channels=192, out_channels=128, kernel_size=(7, 1), stride=(2, 1))
         batch_norm_2 = nn.BatchNorm2d(num_features=128)
 
-        conv_3 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=(8, 1), stride=(1, 1))
+        conv_3 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=(8, 1), stride=(1, 1), padding='same')
         batch_norm_3 = nn.BatchNorm2d(num_features=128)
 
-        conv_4 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=(8, 1), stride=(1, 1))
+        conv_4 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=(8, 1), stride=(1, 1), padding='same')
         batch_norm_4 = nn.BatchNorm2d(num_features=64)
 
-        conv_5 = nn.Conv2d(in_channels=64, out_channels=4, kernel_size=(8, 1), stride=(1, 1))
+        conv_5 = nn.Conv2d(in_channels=64, out_channels=4, kernel_size=(8, 1), stride=(1, 1), padding='same')
 
         self.generator_network = nn.ModuleList([
             dense_0,
@@ -61,19 +51,54 @@ class Generator(nn.Module):
             conv_5,
         ])
 
-        # self.batch_norm = nn.BatchNorm1d()
-        # generator_model = Model(inputs=[sequence_class_input] + generator_inputs,
-        #                         outputs=[
-        #                             sequence_class,
-        #                             pwm_logits_1,
-        #                             pwm_logits_2,
-        #                             pwm_1,
-        #                             pwm_2,
-        #                             sampled_pwm_1,
-        #                             sampled_pwm_2,
-        #                             onehot_mask,
-        #                             sampled_onehot_mask
-        #                         ] + extra_outputs)
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        for i, layer in enumerate(self.generator_network):
+            x = layer(x)
+
+            # reshape for 2D ops
+            if i == 0:
+                x = x.reshape(self.batch_size, 384, 9, 1)
+
+            # if i == 7:
+            #     break
+
+            if isinstance(layer, nn.BatchNorm2d):
+                x = F.relu(x)
+
+        return x.reshape(self.batch_size, self.seq_length, 4, 1)
+
+
+class Generator(nn.Module):
+
+    def __init__(self,
+                 device: torch.device,
+                 latent_dim: int = 100,
+                 batch_size: int = 32,
+                 seq_length: int = 101,
+                 n_classes: int = 1,
+                 n_samples: int = 10,
+                 supply_inputs: bool = False) -> None:
+        super(Generator, self).__init__()
+
+        self.batch_size = batch_size
+        self.seq_length = seq_length
+        self.n_classes = n_classes
+        self.latent_dim = latent_dim
+        self.n_samples = n_samples
+
+        self.supply_inputs = supply_inputs
+        self.device = device
+
+        self.generator_network = GeneratorNetwork(latent_dim=latent_dim,
+                                                  batch_size=batch_size,
+                                                  seq_length=seq_length,
+                                                  n_classes=n_classes).to(self.device)
+
+        self.onehot_template_layer = nn.Embedding(n_classes, seq_length * 4)
+        nn.init.constant_(self.onehot_template_layer.weight, 0)
+
+        self.onehot_mask_layer = nn.Embedding(n_classes, seq_length * 4)
+        nn.init.constant_(self.onehot_mask_layer.weight, 1)
 
     def forward(self, random_seed: int = None):
         # Seed class input for all dense/embedding layers
@@ -97,38 +122,40 @@ class Generator(nn.Module):
         seed_input_1 = torch.cat([latent_input_1, class_embedding], dim=-1)
         seed_input_2 = torch.cat([latent_input_2, class_embedding], dim=-1)
 
-        policy_out_1 = seed_input_1
-        policy_out_2 = seed_input_2
+        raw_logits_1 = self.generator_network(seed_input_1)
+        raw_logits_2 = self.generator_network(seed_input_2)
 
-        for i, layer in enumerate(self.generator_network):
-            policy_out_1 = layer(policy_out_1)
-            policy_out_2 = layer(policy_out_2)
-
-            # reshape for 2D ops
-            if i == 0:
-                policy_out_1 = policy_out_1.reshape(self.batch_size, 384, 9, 1)
-                policy_out_2 = policy_out_2.reshape(self.batch_size, 384, 9, 1)
-
-            if isinstance(layer, nn.BatchNorm2d):
-                policy_out_1 = F.relu(policy_out_1)
-                policy_out_2 = F.relu(policy_out_2)
-
-        # return sequence_class, sequence_class_onehots, class_embedding
-
-        # policy_out_1 = policy_out_1.reshape(self.batch_size, self.seq_length, 4, 1)
-
-        return policy_out_1
-        # Initialize Templating and Masking Lambda layer
-
-        # Batch Normalize PWM Logits
+        onehot_template = self.onehot_template_layer(sequence_class).reshape(self.batch_size, self.seq_length, 4, 1)
+        onehot_mask = self.onehot_mask_layer(sequence_class).reshape(self.batch_size, self.seq_length, 4, 1)
 
         # Add Template and Multiply Mask
+        pwm_logits_1 = raw_logits_1 * onehot_mask + onehot_template
+        pwm_logits_2 = raw_logits_2 * onehot_mask + onehot_template
 
         # Compute PWMs (Nucleotide-wise Softmax)
+        pwm_1 = F.softmax(pwm_logits_1, dim=-2)
+        pwm_2 = F.softmax(pwm_logits_2, dim=-2)
 
         # Sample proper One-hot coded sequences from PWMs
+        # Optionally tile each PWM to sample from and create sample axis
 
-        return sequence_class
+        # pwm_logits_upsampled_1 = Lambda(lambda x: K.tile(x, [n_samples, 1, 1, 1]))(pwm_logits_1)
+        # pwm_logits_upsampled_2 = Lambda(lambda x: K.tile(x, [n_samples, 1, 1, 1]))(pwm_logits_2)
+        # sampled_onehot_mask = Lambda(lambda x: K.tile(x, [n_samples, 1, 1, 1]))(onehot_mask)
+
+        # sampled_pwm_1 = Lambda(sample_func, name='pwm_sampler_1')(pwm_logits_upsampled_1)
+        # #sampled_pwm_1 = Lambda(lambda x: K.reshape(x, (n_samples, batch_size, seq_length, 4, 1)))(sampled_pwm_1)
+        # sampled_pwm_1 = Lambda(lambda x: K.permute_dimensions(K.reshape(x, (n_samples, batch_size, seq_length, 4, 1)), (1, 0, 2, 3, 4)))(sampled_pwm_1)
+
+        # sampled_pwm_2 = Lambda(sample_func, name='pwm_sampler_2')(pwm_logits_upsampled_2)
+        # #sampled_pwm_2 = Lambda(lambda x: K.reshape(x, (n_samples, batch_size, seq_length, 4, 1)))(sampled_pwm_2)
+        # sampled_pwm_2 = Lambda(lambda x: K.permute_dimensions(K.reshape(x, (n_samples, batch_size, seq_length, 4, 1)), (1, 0, 2, 3, 4)))(sampled_pwm_2)
+
+        # #sampled_onehot_mask = Lambda(lambda x: K.reshape(x, (n_samples, batch_size, seq_length, 4, 1)), (1, 0, 2, 3, 4))(sampled_onehot_mask)
+        # sampled_onehot_mask = Lambda(lambda x: K.permute_dimensions(K.reshape(x, (n_samples, batch_size, seq_length, 4, 1)), (1, 0, 2, 3, 4)))(sampled_onehot_mask)
+
+        # Lock all generator layers except policy layers
+        return pwm_1
 
 
 class Predictor(nn.Module):

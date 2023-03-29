@@ -139,15 +139,15 @@ class Generator(nn.Module):
         # Sample proper One-hot coded sequences from PWMs
         # Optionally tile each PWM to sample from and create sample axis
 
-        # pwm_logits_upsampled_1 = Lambda(lambda x: K.tile(x, [n_samples, 1, 1, 1]))(pwm_logits_1)
-        # pwm_logits_upsampled_2 = Lambda(lambda x: K.tile(x, [n_samples, 1, 1, 1]))(pwm_logits_2)
-        # sampled_onehot_mask = Lambda(lambda x: K.tile(x, [n_samples, 1, 1, 1]))(onehot_mask)
+        pwm_logits_upsampled_1 = torch.tile(pwm_logits_1, (self.n_samples, 1, 1, 1))
+        pwm_logits_upsampled_2 = torch.tile(pwm_logits_2, (self.n_samples, 1, 1, 1))
+        sampled_onehot_mask = torch.tile(onehot_mask, (self.n_samples, 1, 1, 1))
 
-        # sampled_pwm_1 = Lambda(sample_func, name='pwm_sampler_1')(pwm_logits_upsampled_1)
+        sampled_pwm_1 = self.sample_pwm(pwm_logits_upsampled_1)
         # #sampled_pwm_1 = Lambda(lambda x: K.reshape(x, (n_samples, batch_size, seq_length, 4, 1)))(sampled_pwm_1)
         # sampled_pwm_1 = Lambda(lambda x: K.permute_dimensions(K.reshape(x, (n_samples, batch_size, seq_length, 4, 1)), (1, 0, 2, 3, 4)))(sampled_pwm_1)
 
-        # sampled_pwm_2 = Lambda(sample_func, name='pwm_sampler_2')(pwm_logits_upsampled_2)
+        sampled_pwm_2 = self.sample_pwm(pwm_logits_upsampled_2)
         # #sampled_pwm_2 = Lambda(lambda x: K.reshape(x, (n_samples, batch_size, seq_length, 4, 1)))(sampled_pwm_2)
         # sampled_pwm_2 = Lambda(lambda x: K.permute_dimensions(K.reshape(x, (n_samples, batch_size, seq_length, 4, 1)), (1, 0, 2, 3, 4)))(sampled_pwm_2)
 
@@ -156,6 +156,15 @@ class Generator(nn.Module):
 
         # Lock all generator layers except policy layers
         return pwm_1
+
+    def sample_pwm(self, pwm_logits: torch.Tensor):
+        flat_pwm = pwm_logits.reshape(-1, 4)
+        if self.training:
+            sampled_pwm = st_sampled_softmax(flat_pwm)
+        else:
+            sampled_pwm = st_hardmax_softmax(flat_pwm)
+
+        return sampled_pwm.reshape(-1, self.seq_length, 4, 1)
 
 
 class Predictor(nn.Module):

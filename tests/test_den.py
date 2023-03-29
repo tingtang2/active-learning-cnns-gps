@@ -6,7 +6,7 @@ device = torch.device('cuda')
 
 def test_input_sequence():
     generator = Generator(device, seq_length=109, n_classes=5).to(device)
-    print(torch.sum(generator()[0, 0, :, :]))
+    print(generator().shape)
 
     # print(policy_out_1.shape)
 

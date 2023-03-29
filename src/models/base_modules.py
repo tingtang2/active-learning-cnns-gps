@@ -1,4 +1,6 @@
 from torch import nn
+import torch
+import torch.nn.functional as F
 
 
 class SharedDropout(nn.Module):
@@ -108,4 +110,33 @@ class MLP(nn.Module):
         x = self.activation(x)
         x = self.dropout(x)
 
+        return x
+
+
+# straight through estimator utilities
+# from https://hassanaskary.medium.com/intuitive-explanation-of-straight-through-estimators-with-pytorch-implementation-71d99d25d9d0
+# TODO: replace this with gumbel softmax
+
+
+class STEMulCeilFunction(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, sample, probs):
+        print(sample)
+        print(probs)
+        print(torch.equal(torch.ceil(sample * probs), sample))
+        return torch.ceil(sample * probs).float()
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        return grad_output, grad_output
+
+
+class StraightThroughEstimator(nn.Module):
+
+    def __init__(self):
+        super(StraightThroughEstimator, self).__init__()
+
+    def forward(self, sample, probs):
+        x = STEMulCeilFunction.apply(sample, probs)
         return x

@@ -6,6 +6,8 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
+from models.base_modules import StraightThroughEstimator
+
 
 class GeneratorNetwork(nn.Module):
 
@@ -100,6 +102,8 @@ class Generator(nn.Module):
         self.onehot_mask_layer = nn.Embedding(n_classes, seq_length * 4)
         nn.init.constant_(self.onehot_mask_layer.weight, 1)
 
+        self.straight_through = StraightThroughEstimator()
+
     def forward(self, random_seed: int = None):
         # Seed class input for all dense/embedding layers
         sequence_class = torch.randint(low=0,
@@ -155,14 +159,19 @@ class Generator(nn.Module):
         # sampled_onehot_mask = Lambda(lambda x: K.permute_dimensions(K.reshape(x, (n_samples, batch_size, seq_length, 4, 1)), (1, 0, 2, 3, 4)))(sampled_onehot_mask)
 
         # Lock all generator layers except policy layers
-        return pwm_1
+        return sampled_pwm_1
 
-    def sample_pwm(self, pwm_logits: torch.Tensor):
+    def sample_pwm(self, pwm_logits: torch.Tensor) -> torch.Tensor:
         flat_pwm = pwm_logits.reshape(-1, 4)
+        nt_probs = F.softmax(flat_pwm, dim=-1)
+
+        # implement straight-through gradient estimation
         if self.training:
-            sampled_pwm = st_sampled_softmax(flat_pwm)
+            sampled_onehot = F.one_hot(torch.multinomial(input=nt_probs, num_samples=1).squeeze(1))
         else:
-            sampled_pwm = st_hardmax_softmax(flat_pwm)
+            sampled_onehot = F.one_hot(nt_probs.argmax(1))
+
+        sampled_pwm = self.straight_through(sampled_onehot, nt_probs)
 
         return sampled_pwm.reshape(-1, self.seq_length, 4, 1)
 

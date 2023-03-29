@@ -145,21 +145,24 @@ class Generator(nn.Module):
 
         pwm_logits_upsampled_1 = torch.tile(pwm_logits_1, (self.n_samples, 1, 1, 1))
         pwm_logits_upsampled_2 = torch.tile(pwm_logits_2, (self.n_samples, 1, 1, 1))
-        sampled_onehot_mask = torch.tile(onehot_mask, (self.n_samples, 1, 1, 1))
+        sampled_onehot_mask = torch.tile(onehot_mask,
+                                         (self.n_samples,
+                                          1,
+                                          1,
+                                          1)).reshape(self.batch_size,
+                                                      self.n_samples,
+                                                      self.seq_length,
+                                                      4,
+                                                      1)
 
         sampled_pwm_1 = self.sample_pwm(pwm_logits_upsampled_1)
-        # #sampled_pwm_1 = Lambda(lambda x: K.reshape(x, (n_samples, batch_size, seq_length, 4, 1)))(sampled_pwm_1)
-        # sampled_pwm_1 = Lambda(lambda x: K.permute_dimensions(K.reshape(x, (n_samples, batch_size, seq_length, 4, 1)), (1, 0, 2, 3, 4)))(sampled_pwm_1)
 
         sampled_pwm_2 = self.sample_pwm(pwm_logits_upsampled_2)
-        # #sampled_pwm_2 = Lambda(lambda x: K.reshape(x, (n_samples, batch_size, seq_length, 4, 1)))(sampled_pwm_2)
-        # sampled_pwm_2 = Lambda(lambda x: K.permute_dimensions(K.reshape(x, (n_samples, batch_size, seq_length, 4, 1)), (1, 0, 2, 3, 4)))(sampled_pwm_2)
 
-        # #sampled_onehot_mask = Lambda(lambda x: K.reshape(x, (n_samples, batch_size, seq_length, 4, 1)), (1, 0, 2, 3, 4))(sampled_onehot_mask)
         # sampled_onehot_mask = Lambda(lambda x: K.permute_dimensions(K.reshape(x, (n_samples, batch_size, seq_length, 4, 1)), (1, 0, 2, 3, 4)))(sampled_onehot_mask)
 
         # Lock all generator layers except policy layers
-        return sampled_pwm_1
+        return sampled_pwm_1, sampled_pwm_2, sampled_pwm_1
 
     def sample_pwm(self, pwm_logits: torch.Tensor) -> torch.Tensor:
         flat_pwm = pwm_logits.reshape(-1, 4)
@@ -173,7 +176,7 @@ class Generator(nn.Module):
 
         sampled_pwm = self.straight_through(sampled_onehot, nt_probs)
 
-        return sampled_pwm.reshape(-1, self.seq_length, 4, 1)
+        return sampled_pwm.reshape(self.batch_size, self.n_samples, self.seq_length, 4, 1)
 
 
 class Predictor(nn.Module):

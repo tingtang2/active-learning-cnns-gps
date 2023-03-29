@@ -122,9 +122,6 @@ class STEMulCeilFunction(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, sample, probs):
-        print(sample)
-        print(probs)
-        print(torch.equal(torch.ceil(sample * probs), sample))
         return torch.ceil(sample * probs).float()
 
     @staticmethod

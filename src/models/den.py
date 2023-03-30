@@ -6,6 +6,8 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
+from models.base_cnn import BaseCNN
+
 from models.base_modules import StraightThroughEstimator
 
 
@@ -162,7 +164,7 @@ class Generator(nn.Module):
         # sampled_onehot_mask = Lambda(lambda x: K.permute_dimensions(K.reshape(x, (n_samples, batch_size, seq_length, 4, 1)), (1, 0, 2, 3, 4)))(sampled_onehot_mask)
 
         # Lock all generator layers except policy layers
-        return sampled_pwm_1, sampled_pwm_2, sampled_pwm_1
+        return sampled_pwm_1, sampled_pwm_2, sampled_onehot_mask
 
     def sample_pwm(self, pwm_logits: torch.Tensor) -> torch.Tensor:
         flat_pwm = pwm_logits.reshape(-1, 4)
@@ -191,8 +193,17 @@ class Predictor(nn.Module):
 # nn.Module class for Deep Exploration Network
 class DEN(nn.Module):
 
-    def __init__(self) -> None:
+    def __init__(self, device: torch.device, **kwargs) -> None:
         super(DEN, self).__init__()
+        self.device = device
+        self.generator = Generator(device=device, **kwargs)
 
-    def forward():
+        self.trainable_predictor = BaseCNN()
+
+    def forward(self):
+        sampled_pwm_1, sampled_pwm_2, sampled_onehot_mask = self.generator()
+
+        return self.trainable_predictor(sampled_pwm_1)
+
+    def compute_loss(self):
         pass

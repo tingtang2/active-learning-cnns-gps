@@ -1,5 +1,6 @@
 # contains modules for deep kernel learning baselines
 import gpytorch
+
 from models.base_cnn import BaseCNN
 
 

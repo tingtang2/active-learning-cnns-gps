@@ -4,9 +4,10 @@ from typing import Tuple
 
 import numpy as np
 import torch
-from data.data_loader import create_dataloaders, create_test_dataloader
 from torch.utils.data import DataLoader
 from tqdm import trange
+
+from data.data_loader import create_dataloaders, create_test_dataloader
 from trainers.base_trainer import BaseTrainer
 
 

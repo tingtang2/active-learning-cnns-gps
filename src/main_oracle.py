@@ -4,10 +4,13 @@ import sys
 from datetime import date
 
 import torch
-import wandb
 from torch.nn import MSELoss
 from torch.optim import AdamW, RMSprop
-from trainers.cnn_oracle_trainer import CNNOracleTrainer, ResNetOracleTrainer, DeepFactorizedOracleTrainer
+
+import wandb
+from trainers.cnn_oracle_trainer import (CNNOracleTrainer,
+                                         DeepFactorizedOracleTrainer,
+                                         ResNetOracleTrainer)
 
 arg_model_trainer_map = {
     'cnn': CNNOracleTrainer,

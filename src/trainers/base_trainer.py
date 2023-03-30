@@ -7,8 +7,9 @@ from typing import List, Tuple, Union
 import pandas as pd
 import plotly.express as px
 import torch
-from data.data_loader import create_dataloaders, get_oracle_splits, get_splits
 from torch.utils.data import DataLoader
+
+from data.data_loader import create_dataloaders, get_oracle_splits, get_splits
 
 
 class BaseTrainer(ABC):

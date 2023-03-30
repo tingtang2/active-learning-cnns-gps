@@ -3,16 +3,16 @@ from timeit import default_timer as timer
 from typing import Tuple
 
 import torch
-import wandb
-from models.base_cnn import OracleCNN
-from models.resnets import ResNet
-from models.MPRA_DragoNN import DeepFactorizedModel
 from scipy.stats import pearsonr, spearmanr
+from torch.optim.lr_scheduler import ExponentialLR
 from torch.utils.data import DataLoader
 from tqdm import trange
-from trainers.base_trainer import BaseOracleTrainer
 
-from torch.optim.lr_scheduler import ExponentialLR
+import wandb
+from models.base_cnn import OracleCNN
+from models.MPRA_DragoNN import DeepFactorizedModel
+from models.resnets import ResNet
+from trainers.base_trainer import BaseOracleTrainer
 
 
 class CNNOracleTrainer(BaseOracleTrainer):

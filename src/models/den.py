@@ -2,12 +2,13 @@
 # adapted from https://github.com/johli/genesis/blob/master/analysis/splicing/definitions/generator/splirent_deconv_conv_generator_concat.py
 # for generator network architecture and https://github.com/johli/genesis/blob/master/genesis/generator/genesis_generator.py
 # for PWM generation and sampling procedures
+from typing import List
+
 import torch
 import torch.nn.functional as F
 from torch import nn
 
 from models.base_cnn import BaseCNN
-
 from models.base_modules import StraightThroughEstimator
 
 
@@ -75,6 +76,8 @@ class GeneratorNetwork(nn.Module):
 class Generator(nn.Module):
 
     def __init__(self,
+                 embedding_template: torch.Tensor,
+                 embedding_mask: torch.Tensor,
                  device: torch.device,
                  latent_dim: int = 100,
                  batch_size: int = 32,
@@ -98,13 +101,13 @@ class Generator(nn.Module):
                                                   seq_length=seq_length,
                                                   n_classes=n_classes).to(self.device)
 
-        self.onehot_template_layer = nn.Embedding(n_classes, seq_length * 4)
-        nn.init.constant_(self.onehot_template_layer.weight, 0)
+        self.onehot_template_layer = nn.Embedding(n_classes, seq_length * 4, _weight=embedding_template)
+        self.onehot_template_layer.weight.requires_grad = False
 
-        self.onehot_mask_layer = nn.Embedding(n_classes, seq_length * 4)
-        nn.init.constant_(self.onehot_mask_layer.weight, 1)
+        self.onehot_mask_layer = nn.Embedding(n_classes, seq_length * 4, _weight=embedding_mask)
+        self.onehot_mask_layer.weight.requires_grad = False
 
-        self.straight_through = StraightThroughEstimator()
+        self.straight_through = StraightThroughEstimator()    # for gradient flow through sampling
 
     def forward(self, random_seed: int = None):
         # Seed class input for all dense/embedding layers
@@ -147,6 +150,7 @@ class Generator(nn.Module):
 
         pwm_logits_upsampled_1 = torch.tile(pwm_logits_1, (self.n_samples, 1, 1, 1))
         pwm_logits_upsampled_2 = torch.tile(pwm_logits_2, (self.n_samples, 1, 1, 1))
+
         sampled_onehot_mask = torch.tile(onehot_mask,
                                          (self.n_samples,
                                           1,
@@ -158,12 +162,8 @@ class Generator(nn.Module):
                                                       1)
 
         sampled_pwm_1 = self.sample_pwm(pwm_logits_upsampled_1)
-
         sampled_pwm_2 = self.sample_pwm(pwm_logits_upsampled_2)
 
-        # sampled_onehot_mask = Lambda(lambda x: K.permute_dimensions(K.reshape(x, (n_samples, batch_size, seq_length, 4, 1)), (1, 0, 2, 3, 4)))(sampled_onehot_mask)
-
-        # Lock all generator layers except policy layers
         return sampled_pwm_1, sampled_pwm_2, sampled_onehot_mask
 
     def sample_pwm(self, pwm_logits: torch.Tensor) -> torch.Tensor:

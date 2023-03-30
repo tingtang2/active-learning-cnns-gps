@@ -4,12 +4,17 @@ import sys
 from datetime import date
 
 import torch
-from models.base_cnn import BaseCNN
-from models.dkl import GPRegressionModel
 from torch.nn import MSELoss
 from torch.optim import AdamW, RMSprop
-from trainers.exact_dkl_trainer import (ExactDKLDEIMOSTrainer, ExactDKLMaxVarTrainer, ExactDKLRandomTrainer)
-from trainers.mc_dropout_trainer import (MCDropoutDEIMOSTrainer, MCDropoutMaxVarTrainer, MCDropoutRandomTrainer)
+
+from models.base_cnn import BaseCNN
+from models.dkl import GPRegressionModel
+from trainers.exact_dkl_trainer import (ExactDKLDEIMOSTrainer,
+                                        ExactDKLMaxVarTrainer,
+                                        ExactDKLRandomTrainer)
+from trainers.mc_dropout_trainer import (MCDropoutDEIMOSTrainer,
+                                         MCDropoutMaxVarTrainer,
+                                         MCDropoutRandomTrainer)
 
 arg_model_trainer_map = {
     'random': (MCDropoutRandomTrainer,

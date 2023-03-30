@@ -4,8 +4,9 @@ import h5py
 import scipy
 import torch
 from cnn_gp import save_K
-from models.infinite_filter import initialize_base_cnn
 from tqdm import trange
+
+from models.infinite_filter import initialize_base_cnn
 from trainers.base_trainer import BaseTrainer
 
 

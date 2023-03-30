@@ -3,12 +3,13 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from configs import PATH_TO_DIRECTORY
-from data.old_dataset import get_dataset
 from numpy import ndarray
 from sklearn.model_selection import train_test_split
 from torch import Tensor
 from torch.utils.data import DataLoader, Dataset
+
+from configs import PATH_TO_DIRECTORY
+from data.old_dataset import get_dataset
 
 
 class FivePSplicingDataset(Dataset):

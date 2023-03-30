@@ -1,6 +1,8 @@
 from typing import Tuple
 
 import numpy as np
+import torch
+
 from configs import PATH_TO_DIRECTORY
 
 nuc_arr = ['A', 'C', 'G', 'T']
@@ -41,3 +43,8 @@ def get_dataset() -> Tuple[np.ndarray, np.ndarray]:
             ind += 1
 
     return np.array(inputs), np.array(prob_s1)
+
+
+# New method for creation of templates for DEN
+def create_sequence_templates():
+    pass

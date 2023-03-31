@@ -181,15 +181,6 @@ class Generator(nn.Module):
         return sampled_pwm.reshape(self.batch_size, self.n_samples, self.seq_length, 4, 1)
 
 
-class Predictor(nn.Module):
-
-    def __init__(self) -> None:
-        super(Predictor, self).__init__()
-
-    def forward():
-        pass
-
-
 # nn.Module class for Deep Exploration Network
 class DEN(nn.Module):
 
@@ -197,6 +188,7 @@ class DEN(nn.Module):
                  embedding_template: torch.Tensor,
                  embedding_mask: torch.Tensor,
                  device: torch.device,
+                 model_type: nn.Module = BaseCNN,
                  latent_dim: int = 100,
                  batch_size: int = 32,
                  seq_length: int = 101,
@@ -212,7 +204,7 @@ class DEN(nn.Module):
                                    n_classes=n_classes,
                                    n_samples=n_samples)
 
-        self.trainable_predictor = BaseCNN()
+        self.trainable_predictor = model_type()
 
     def forward(self):
         sampled_pwm_1, sampled_pwm_2, sampled_onehot_mask = self.generator()

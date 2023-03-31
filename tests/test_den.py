@@ -15,7 +15,7 @@ def test_full_den():
     embedding_template, embedding_mask = create_sequence_templates()
     model = DEN(embedding_template, embedding_mask, device, seq_length=101, n_classes=1).to(device)
 
-    print(model())
+    print(model().shape)
 
 
 # test_input_sequence()

@@ -1,1 +1,3 @@
-from src.data.old_dataset import get_dataset
+from data.old_dataset import create_sequence_templates
+
+create_sequence_templates()

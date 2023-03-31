@@ -1,10 +1,12 @@
 from models.den import Generator
+from data.old_dataset import create_sequence_templates
 import torch
 
 device = torch.device('cuda')
 
 
 def test_input_sequence():
+    embedding_template, embedding_mask = create_sequence_templates()
     generator = Generator(device, seq_length=109, n_classes=5).to(device)
     print(generator().shape)
 

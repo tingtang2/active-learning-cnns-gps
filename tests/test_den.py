@@ -1,4 +1,4 @@
-from models.den import Generator
+from models.den import Generator, DEN
 from data.old_dataset import create_sequence_templates
 import torch
 
@@ -7,15 +7,16 @@ device = torch.device('cuda')
 
 def test_input_sequence():
     embedding_template, embedding_mask = create_sequence_templates()
-    generator = Generator(device, seq_length=109, n_classes=5).to(device)
-    print(generator().shape)
-
-    # print(policy_out_1.shape)
-
-    # sequence_class, one_hots, combined = generator()
-    # print(sequence_class)
-    # print(one_hots)
-    # print(combined.shape)
+    generator = Generator(embedding_template, embedding_mask, device, seq_length=101, n_classes=1).to(device)
+    print(generator()[0].dtype)
 
 
-test_input_sequence()
+def test_full_den():
+    embedding_template, embedding_mask = create_sequence_templates()
+    model = DEN(embedding_template, embedding_mask, device, seq_length=101, n_classes=1).to(device)
+
+    print(model())
+
+
+# test_input_sequence()
+test_full_den()

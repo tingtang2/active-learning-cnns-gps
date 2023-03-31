@@ -63,7 +63,7 @@ def create_sequence_templates(seq_len=101) -> Tuple[torch.Tensor, torch.Tensor]:
     embedding_template[-1, :] = -4.    # last position weird
     embedding_template[-1, 3] = 10.    # last position weird
 
-    return torch.from_numpy(embedding_template), torch.from_numpy(embedding_mask)
+    return torch.from_numpy(embedding_template).reshape(1, -1), torch.from_numpy(embedding_mask).reshape(1, -1)
 
 
 #Function converting nucleotide sequence to numerical array with 4 channels

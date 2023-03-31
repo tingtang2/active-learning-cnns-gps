@@ -22,7 +22,7 @@ class GeneratorNetwork(nn.Module):
         self.latent_dim = latent_dim
 
         # Policy/generator network definition
-        dense_0 = nn.Linear(in_features=self.latent_dim + self.n_classes, out_features=9 * 384)
+        dense_0 = nn.Linear(in_features=self.latent_dim + self.n_classes, out_features=8 * 384)
 
         deconv_0 = nn.ConvTranspose2d(in_channels=384, out_channels=256, kernel_size=(7, 1), stride=(2, 1))
         batch_norm_0 = nn.BatchNorm2d(num_features=256)
@@ -62,7 +62,7 @@ class GeneratorNetwork(nn.Module):
 
             # reshape for 2D ops
             if i == 0:
-                x = x.reshape(self.batch_size, 384, 9, 1)
+                x = x.reshape(self.batch_size, 384, 8, 1)
 
             # if i == 7:
             #     break
@@ -193,17 +193,31 @@ class Predictor(nn.Module):
 # nn.Module class for Deep Exploration Network
 class DEN(nn.Module):
 
-    def __init__(self, device: torch.device, **kwargs) -> None:
+    def __init__(self,
+                 embedding_template: torch.Tensor,
+                 embedding_mask: torch.Tensor,
+                 device: torch.device,
+                 latent_dim: int = 100,
+                 batch_size: int = 32,
+                 seq_length: int = 101,
+                 n_classes: int = 1,
+                 n_samples: int = 10) -> None:
         super(DEN, self).__init__()
-        self.device = device
-        self.generator = Generator(device=device, **kwargs)
+        self.generator = Generator(embedding_template=embedding_template,
+                                   embedding_mask=embedding_mask,
+                                   device=device,
+                                   latent_dim=latent_dim,
+                                   batch_size=batch_size,
+                                   seq_length=seq_length,
+                                   n_classes=n_classes,
+                                   n_samples=n_samples)
 
         self.trainable_predictor = BaseCNN()
 
     def forward(self):
         sampled_pwm_1, sampled_pwm_2, sampled_onehot_mask = self.generator()
 
-        return self.trainable_predictor(sampled_pwm_1)
+        return self.trainable_predictor(sampled_pwm_1.reshape(-1, self.generator.seq_length, 4))
 
     def compute_loss(self):
         pass

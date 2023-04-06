@@ -193,7 +193,7 @@ class DEN(nn.Module):
                  batch_size: int = 32,
                  seq_length: int = 101,
                  n_classes: int = 1,
-                 n_samples: int = 10) -> None:
+                 n_samples: int = 100) -> None:
         super(DEN, self).__init__()
         self.generator = Generator(embedding_template=embedding_template,
                                    embedding_mask=embedding_mask,
@@ -209,7 +209,7 @@ class DEN(nn.Module):
     def forward(self):
         sampled_pwm_1, sampled_pwm_2, sampled_onehot_mask = self.generator()
 
-        return self.trainable_predictor(sampled_pwm_1.reshape(-1, self.generator.seq_length, 4))
+        return sampled_pwm_1, self.trainable_predictor(sampled_pwm_1.reshape(-1, self.generator.seq_length, 4))
 
     def compute_loss(self):
         pass

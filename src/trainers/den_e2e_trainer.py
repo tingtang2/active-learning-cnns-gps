@@ -69,6 +69,16 @@ class DenE2ETrainer:
                 f"Epoch time = {(end_time - start_time):.3f}s")
             logging.info(log_string)
 
+            if val_loss < best_val_loss:
+                self.save_model(self.name)
+                early_stopping_counter = 0
+                best_val_loss = val_loss
+            else:
+                early_stopping_counter += 1
+
+            if early_stopping_counter == self.early_stopping_threshold:
+                break
+
     def eval(self, loader: DataLoader, save_plot=False) -> Tuple[torch.Tensor, object]:
         """evaluates model on given data loader. computes loss and spearman correlation between predictions and labels
 

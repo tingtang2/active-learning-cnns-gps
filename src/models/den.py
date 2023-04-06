@@ -193,7 +193,7 @@ class DEN(nn.Module):
                  batch_size: int = 32,
                  seq_length: int = 101,
                  n_classes: int = 1,
-                 n_samples: int = 100) -> None:
+                 n_samples: int = 10) -> None:
         super(DEN, self).__init__()
         self.generator = Generator(embedding_template=embedding_template,
                                    embedding_mask=embedding_mask,

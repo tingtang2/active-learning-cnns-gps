@@ -207,6 +207,3 @@ class DEN(nn.Module):
         sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask = self.generator()
 
         return sampled_pwm_1, self.trainable_predictor(sampled_pwm_1.reshape(-1, self.generator.seq_length, 4)), sampled_pwm_2,  pwm_1, onehot_mask, sampled_onehot_mask
-
-    def compute_loss(self):
-        pass

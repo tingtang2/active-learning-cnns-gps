@@ -8,27 +8,11 @@ from torch.nn import MSELoss
 from torch.optim import AdamW, RMSprop
 
 from models.base_cnn import BaseCNN
-from models.dkl import GPRegressionModel
-from trainers.exact_dkl_trainer import (ExactDKLDEIMOSTrainer,
-                                        ExactDKLMaxVarTrainer,
-                                        ExactDKLRandomTrainer)
-from trainers.mc_dropout_trainer import (MCDropoutDEIMOSTrainer,
-                                         MCDropoutMaxVarTrainer,
-                                         MCDropoutRandomTrainer)
+from trainers.al_den_trainer import MCDropoutMaxVarDenTrainer
 
 arg_model_trainer_map = {
-    'random': (MCDropoutRandomTrainer,
-               BaseCNN),
-    'random_dkl': (ExactDKLRandomTrainer,
-                   GPRegressionModel),
-    'max_variance': (MCDropoutMaxVarTrainer,
+    'max_variance': (MCDropoutMaxVarDenTrainer,
                      BaseCNN),
-    'max_variance_dkl': (ExactDKLMaxVarTrainer,
-                         GPRegressionModel),
-    'deimos_dkl': (ExactDKLDEIMOSTrainer,
-                   GPRegressionModel),
-    'deimos': (MCDropoutDEIMOSTrainer,
-               BaseCNN)
 }
 arg_optimizer_map = {'rmsprop': RMSprop, 'adamw': AdamW}
 
@@ -71,7 +55,7 @@ def main() -> int:
     parser.add_argument('--log_save_dir',
                         default='/gpfs/commons/home/tchen/al_project/active-learning-save/active-learning-logs/',
                         help='path to saved log files')
-    parser.add_argument('--acquisition_fn_type', default='random', help='type of acquistion function to use')
+    parser.add_argument('--acquisition_fn_type', default='max_variance', help='type of acquistion function to use')
     parser.add_argument('--optimizer', default='adamw', help='type of optimizer to use')
     parser.add_argument('--num_repeats', default=3, type=int, help='number of times to repeat experiment')
     parser.add_argument('--seed', default=11202022, type=int, help='random seed to be used in numpy and torch')
@@ -79,6 +63,11 @@ def main() -> int:
                         default=20,
                         type=int,
                         help='max root decomposition size for predictive covariance in DEIMOS exact DKL method')
+    parser.add_argument(
+        '--oracle_save_path',
+        default='/gpfs/commons/home/tchen/al_project/active-learning-save/saved_metrics/models/base_cnn_oracle.pt',
+        help='path to saved oracle pt file')
+    parser.add_argument('--learning_rate', default=1e-3, type=float, help='learning rate for optimizer')
 
     args = parser.parse_args()
     configs = args.__dict__

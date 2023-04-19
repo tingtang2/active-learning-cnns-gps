@@ -1,5 +1,5 @@
 import logging
-import math
+from math import ceil, log
 from typing import Tuple
 
 import numpy as np
@@ -7,93 +7,199 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import trange
 
-from data.data_loader import create_test_dataloader
+from data.data_loader import create_dataloaders, create_test_dataloader
 from data.old_dataset import create_sequence_templates
-from models.den import DEN
+from models.base_cnn import OracleCNN
+from models.den import Generator
 from trainers.base_trainer import BaseTrainer
 
 
-class AlDenTrainer(BaseTrainer):
+class DenTrainer(BaseTrainer):
 
-    def __init__(self, device, **kwargs) -> None:
+    def __init__(self, oracle_save_path, **kwargs) -> None:
         super().__init__(**kwargs)
 
         embedding_template, embedding_mask = create_sequence_templates()
 
-        self.den = DEN(embedding_template=embedding_template, embedding_mask=embedding_mask, device=device)
+        self.den = Generator(embedding_template,
+                             embedding_mask,
+                             self.device,
+                             seq_length=101,
+                             n_classes=1).to(self.device)
+        self.optimizer = self.optimizer_type(self.den.parameters(), lr=self.learning_rate)
 
-    def compute_loss(self):
-        pass
-        #Define target isoform loss function
-        # target_iso = np.zeros((len(target_isos), 1))
-        # for i, t_iso in enumerate(target_isos) :
-        #     target_iso[i, 0] = t_iso
+        self.oracle = OracleCNN().to(self.device)
+        self.oracle.load_state_dict(torch.load(oracle_save_path))
+        for param in self.oracle.parameters():
+            param.requires_grad = False
+        self.oracle.eval()
 
-        # masked_entropy_mse_region_1 = get_target_entropy_sme_masked(pwm_start=region_1_start, pwm_end=region_1_end, target_bits=region_1_target_bits)
-        # masked_entropy_mse_region_2 = get_target_entropy_sme_masked(pwm_start=region_2_start, pwm_end=region_2_end, target_bits=region_2_target_bits)
+    def get_reg_loss(self, sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask):
+        entropy_loss = self.entropy_weight * (
+            self.target_entropy_sme_masked(pwm=pwm_1,
+                                           pwm_mask=onehot_mask,
+                                           pwm_start=self.region_1_start,
+                                           pwm_end=self.region_1_end,
+                                           target_bits=self.region_1_target_bits) +
+            self.target_entropy_sme_masked(pwm=pwm_1,
+                                           pwm_mask=onehot_mask,
+                                           pwm_start=self.region_2_start,
+                                           pwm_end=self.region_2_end,
+                                           target_bits=self.region_2_target_bits)) / 2.
 
-        # pwm_sample_entropy_func_region_1 = get_pwm_margin_sample_entropy_masked(pwm_start=region_1_start, pwm_end=region_1_end, margin=similarity_margin, shift_1_nt=True)
-        # pwm_sample_entropy_func_region_2 = get_pwm_margin_sample_entropy_masked(pwm_start=region_2_start, pwm_end=region_2_end, margin=similarity_margin, shift_1_nt=True)
+        entropy_loss += self.similarity_weight * (
+            torch.mean(self.pwm_margin_sample_entropy_masked(sampled_pwm_1=sampled_pwm_1,
+                                                             sampled_pwm_2=sampled_pwm_2,
+                                                             pwm_mask=sampled_onehot_mask,
+                                                             pwm_start=self.region_1_start,
+                                                             pwm_end=self.region_1_end,
+                                                             margin=self.similarity_margin,
+                                                             shift_1_nt=True),
+                       dim=1) + torch.mean(self.pwm_margin_sample_entropy_masked(sampled_pwm_1=sampled_pwm_1,
+                                                                                 sampled_pwm_2=sampled_pwm_2,
+                                                                                 pwm_mask=sampled_onehot_mask,
+                                                                                 pwm_start=self.region_2_start,
+                                                                                 pwm_end=self.region_2_end,
+                                                                                 margin=self.similarity_margin,
+                                                                                 shift_1_nt=True),
+                                           dim=1))
+        return torch.sum(entropy_loss)
 
-        # def loss_func(loss_tensors) :
-        #     _, _, _, sequence_class, pwm_logits_1, pwm_logits_2, pwm_1, pwm_2, sampled_pwm_1, sampled_pwm_2, mask, sampled_mask, hek_pred, hela_pred, mcf7_pred, cho_pred = loss_tensors
+    def target_entropy_sme_masked(self, pwm, pwm_mask, pwm_start=0, pwm_end=100, target_bits=2.0, eps=1e-7):
+        pwm_section = pwm[:, pwm_start:pwm_end, :, :]
+        entropy = pwm_section * -torch.log(torch.clip(pwm_section, eps, 1. - eps)) / log(2.0)
+        entropy = torch.sum(entropy, dim=(2, 3))
+        conservation = 2.0 - entropy
 
-        #     #Create target isoform with sample axis
-        #     iso_targets = K.constant(target_iso)
-        #     iso_true = K.gather(iso_targets, sequence_class[:, 0])
-        #     iso_true = K.tile(K.expand_dims(iso_true, axis=-1), (1, K.shape(sampled_pwm_1)[1], 1))
+        pwm_mask_section = pwm_mask[:, pwm_start:pwm_end, :, :]
+        mask = torch.amax(pwm_mask_section, dim=(2, 3))
+        n_unmasked = torch.sum(mask, dim=-1)
 
-        #     #Specify costs
-        #     iso_loss = 2.0 * K.mean(symmetric_sigmoid_kl_divergence(iso_true, hek_pred), axis=1)
+        return ((torch.sum(conservation * mask, dim=-1) / n_unmasked) - target_bits)**2
 
-        #     seq_loss = 0.0
+    def pwm_margin_sample_entropy_masked(self,
+                                         sampled_pwm_1,
+                                         sampled_pwm_2,
+                                         pwm_mask,
+                                         pwm_start=0,
+                                         pwm_end=100,
+                                         margin=0.5,
+                                         shift_1_nt=False):
+        sampled_pwm_1 = sampled_pwm_1[..., pwm_start:pwm_end, :, :]
+        sampled_pwm_2 = sampled_pwm_2[..., pwm_start:pwm_end, :, :]
 
-        #     entropy_loss = entropy_weight * (masked_entropy_mse_region_1(pwm_1, mask) + masked_entropy_mse_region_2(pwm_1, mask)) / 2.
-        #     entropy_loss += similarity_weight * (K.mean(pwm_sample_entropy_func_region_1(sampled_pwm_1, sampled_pwm_2, sampled_mask), axis=1) + K.mean(pwm_sample_entropy_func_region_2(sampled_pwm_1, sampled_pwm_2, sampled_mask), axis=1)) / 2.
+        sampled_pwm_mask = pwm_mask[..., pwm_start:pwm_end, :, :]
+        mask = torch.amax(sampled_pwm_mask, dim=(-2, -1))
+        n_unmasked = torch.sum(mask, dim=-1)
 
-        #     #Compute total loss
-        #     total_loss = iso_loss + seq_loss + entropy_loss
+        mean_sample_ent = torch.sum(torch.sum(sampled_pwm_1 * sampled_pwm_2, dim=(-2, -1)) * mask, dim=-1) / n_unmasked
+        mean_sample_ent_shift_l_1 = torch.sum(torch.sum(sampled_pwm_1[..., 1:, :, :] * sampled_pwm_2[..., :-1, :, :], dim=(-2, -1)) * mask[..., 1:], dim=-1) / n_unmasked
+        mean_sample_ent_shift_r_1 = torch.sum(torch.sum(sampled_pwm_1[..., :-1, :, :] * sampled_pwm_2[..., 1:, :, :], dim=(-2, -1)) * mask[..., :-1], dim=-1) / n_unmasked
 
-        #     return total_loss
+        margin_sample_ent = torch.where(mean_sample_ent > margin,
+                                        mean_sample_ent - margin,
+                                        torch.zeros_like(mean_sample_ent))
+        margin_sample_ent_l_1 = torch.where(mean_sample_ent_shift_l_1 > margin,
+                                            mean_sample_ent_shift_l_1 - margin,
+                                            torch.zeros_like(mean_sample_ent))
+        margin_sample_ent_r_1 = torch.where(mean_sample_ent_shift_r_1 > margin,
+                                            mean_sample_ent_shift_r_1 - margin,
+                                            torch.zeros_like(mean_sample_ent))
 
-        # return loss_func
+        if shift_1_nt:
+            return margin_sample_ent + margin_sample_ent_l_1 + margin_sample_ent_r_1
+        else:
+            return margin_sample_ent
+
+
+class MCDropoutDenTrainer(DenTrainer):
+
     def active_train_loop(self, iter: int):
+        # seed
         train_pool = [i for i in range(self.begin_train_set_size)]
-        acquisition_pool = [i for i in range(self.begin_train_set_size, self.X_train.shape[0])]
         mse = []
 
-        for round in trange(math.ceil(self.num_acquisitions / self.acquisition_batch_size)):
-            X_train_data = self.X_train[train_pool].astype(np.float32)
-            y_train_data = self.y_train[train_pool].astype(np.float32)
+        X_train_data = self.X_train[train_pool].astype(np.float32)
+        y_train_data = self.y_train[train_pool].astype(np.float32)
 
+        model = self.model_type(dropout_prob=self.dropout_prob).to(self.device)
+
+        optimizer = self.optimizer_type(model.parameters(), lr=0.001, weight_decay=self.l2_penalty / len(train_pool))
+
+        train_dataloader, test_dataloader, num_feats = create_dataloaders(X_train=X_train_data,
+                                                                            y_train=y_train_data,
+                                                                            X_test=self.X_test,
+                                                                            y_test=self.y_test,
+                                                                            device=self.device)
+        new_mse, new_var = self.active_train_iteration(model=model,
+                                                    train_loader=train_dataloader,
+                                                    test_loader=test_dataloader,
+                                                    optimizer=optimizer,
+                                                    eval=True)
+
+        mse.append(new_mse.item())
+        logging.info(f'AL iteration: {round + 1}, MSE: {mse[-1]}, len train set: {len(train_pool)}')
+
+        sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask = self.den()
+        acquisition_pool_labels = self.oracle(sampled_pwm_1.reshape(-1, self.den.seq_length, 4))
+
+        new_points, new_labels = self.acquisition_fn(pool_points=sampled_pwm_1, pool_labels=acquisition_pool_labels, model=model)
+
+        synthetic_acquired_points = [(new_points, new_labels)]
+
+        for round in trange(ceil(self.num_acquisitions / self.acquisition_batch_size)):
             model = self.model_type(dropout_prob=self.dropout_prob).to(self.device)
 
-            optimizer = self.optimizer_type(model.parameters(),
+            optimizer = self.optimizer_type([model.parameters(),
+                                             self.den.parameters()],
                                             lr=0.001,
                                             weight_decay=self.l2_penalty / len(train_pool))
 
-            train_dataloader, test_dataloader, num_feats = create_dataloaders(X_train=X_train_data,
+            train_dataloader, test_dataloader, _ = create_dataloaders(X_train=X_train_data,
                                                                               y_train=y_train_data,
                                                                               X_test=self.X_test,
                                                                               y_test=self.y_test,
                                                                               device=self.device)
-            new_mse, new_var = self.active_train_iteration(model=model,
-                                                     train_loader=train_dataloader,
-                                                     test_loader=test_dataloader,
-                                                     optimizer=optimizer)
+
+            # separate out training of normal data and generated data for convenient autograd purposes
+            self.active_train_iteration(model=model,
+                                        train_loader=train_dataloader,
+                                        test_loader=test_dataloader,
+                                        optimizer=optimizer,
+                                        eval=False)
+
+            self.train_synthetic_iteration(synthetic_pairs=synthetic_acquired_points, model=model, optimizer=optimizer)
+
+            new_mse, new_var = self.eval(model=model, loader=create_test_dataloader(self.X_test, self.y_test, self.device), mc_dropout_iterations=self.test_dropout_iterations)
 
             mse.append(new_mse.item())
-            logging.info(
-                f'AL iteration: {round + 1}, MSE: {mse[-1]}, len train set: {len(train_pool)} len acquisition pool {len(acquisition_pool)}'
-            )
+            logging.info(f'AL iteration: {round + 1}, MSE: {mse[-1]}, len train set: {len(train_pool)}')
 
-            new_points = self.acquisition_fn(pool_points=acquisition_pool, train_points=train_pool, model=model)
+            sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask = self.den()
+            acquisition_pool_labels = self.oracle(sampled_pwm_1.reshape(-1, self.den.seq_length, 4))
 
-            for point in new_points:
-                train_pool.append(point)
-                acquisition_pool.remove(point)
+            new_points, new_labels = self.acquisition_fn(pool_points=sampled_pwm_1, pool_labels=acquisition_pool_labels, model=model)
+
+            synthetic_acquired_points.append((new_points, new_labels))
 
         self.save_metrics(mse, iter)
+
+    def train_synthetic_iteration(self, synthetic_pairs, model, optimizer):
+        model.train()
+        self.den.train()
+        for epoch in range(self.epochs):
+            running_loss = 0.0
+            for batch in synthetic_pairs:
+                optimizer.zero_grad()
+                examples, labels = batch
+
+                predictions = model(examples.reshape(-1, self.den.seq_length, 4)).reshape(-1)
+                loss = self.criterion(predictions, labels)
+
+                loss.backward()
+                optimizer.step()
+
+                running_loss += loss.item()
 
     def active_train_iteration(
         self,
@@ -101,6 +207,7 @@ class AlDenTrainer(BaseTrainer):
         train_loader: DataLoader,
         test_loader: DataLoader,
         optimizer,
+        eval=True,
     ):
         model.train()
         for epoch in range(self.epochs):
@@ -117,7 +224,10 @@ class AlDenTrainer(BaseTrainer):
 
                 running_loss += loss.item()
 
-        return self.eval(model, test_loader, self.test_dropout_iterations)
+        if eval:
+            return self.eval(model, test_loader, self.test_dropout_iterations)
+        else:
+            return
 
     def _enable_dropout(self, model):
         """ Function to enable the dropout layers during test-time """
@@ -142,5 +252,33 @@ class AlDenTrainer(BaseTrainer):
 
         return self.criterion(preds, full_labels.float()), pred_var
 
-    def acquisition_fn(self, pool_points, train_points, model) -> np.ndarray:
-        return self.rng.choice(np.array(pool_points), self.acquisition_batch_size, replace=False)
+
+class MCDropoutMaxVarDenTrainer(MCDropoutDenTrainer):
+
+    def __init__(self, **kwargs):
+        super(MCDropoutMaxVarDenTrainer, self).__init__(**kwargs)
+
+        self.rng = np.random.default_rng(self.seed)
+
+    def acquisition_fn(self, pool_points, pool_labels, model) -> np.ndarray:
+        pool_mse, pool_var = self.den_eval(model=model, pool_points=pool_points, pool_labels=pool_labels, mc_dropout_iterations=self.acquisition_dropout_iterations)
+
+        return pool_points[torch.argsort(pool_var, descending=True)[:self.acquisition_batch_size]],  pool_labels[torch.argsort(pool_var, descending=True)[:self.acquisition_batch_size]]
+
+    def den_eval(self,
+                 model,
+                 pool_points,
+                 pool_labels,
+                 mc_dropout_iterations: int) -> Tuple[torch.Tensor,
+                                                      torch.Tensor]:
+        model.eval()
+        self._enable_dropout(model)
+
+        predictions = torch.empty((mc_dropout_iterations, pool_labels.size(0))).to(self.device)
+
+        with torch.no_grad():
+            for i in range(mc_dropout_iterations):
+                predictions[i] = model(pool_points.reshape(-1, self.den.seq_length, 4)).reshape(-1)
+        pred_var, preds = torch.var_mean(predictions, dim=0)
+
+        return self.criterion(preds, pool_labels.float()), pred_var

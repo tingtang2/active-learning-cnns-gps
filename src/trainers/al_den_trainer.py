@@ -138,7 +138,7 @@ class MCDropoutDenTrainer(DenTrainer):
                                                     eval=True)
 
         mse.append(new_mse.item())
-        logging.info(f'AL iteration: {round + 1}, MSE: {mse[-1]}, len train set: {len(train_pool)}')
+        logging.info(f'AL iteration: {0}, MSE: {mse[-1]}, len train set: {len(train_pool)}')
 
         sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask = self.den()
         acquisition_pool_labels = self.oracle(sampled_pwm_1.reshape(-1, self.den.seq_length, 4))
@@ -150,8 +150,12 @@ class MCDropoutDenTrainer(DenTrainer):
         for round in trange(ceil(self.num_acquisitions / self.acquisition_batch_size)):
             model = self.model_type(dropout_prob=self.dropout_prob).to(self.device)
 
-            optimizer = self.optimizer_type([model.parameters(),
-                                             self.den.parameters()],
+            optimizer = self.optimizer_type([{
+                'params': model.parameters()
+            },
+                                             {
+                                                 'params': self.den.parameters()
+                                             }],
                                             lr=0.001,
                                             weight_decay=self.l2_penalty / len(train_pool))
 
@@ -194,9 +198,9 @@ class MCDropoutDenTrainer(DenTrainer):
                 examples, labels = batch
 
                 predictions = model(examples.reshape(-1, self.den.seq_length, 4)).reshape(-1)
-                loss = self.criterion(predictions, labels)
+                loss = self.criterion(predictions, labels.reshape(-1))
 
-                loss.backward()
+                loss.backward(retain_graph=True)
                 optimizer.step()
 
                 running_loss += loss.item()
@@ -219,7 +223,7 @@ class MCDropoutDenTrainer(DenTrainer):
                 predictions = model(examples).reshape(-1)
                 loss = self.criterion(predictions, labels)
 
-                loss.backward()
+                loss.backward(retain_graph=True)
                 optimizer.step()
 
                 running_loss += loss.item()
@@ -261,9 +265,12 @@ class MCDropoutMaxVarDenTrainer(MCDropoutDenTrainer):
         self.rng = np.random.default_rng(self.seed)
 
     def acquisition_fn(self, pool_points, pool_labels, model) -> np.ndarray:
-        pool_mse, pool_var = self.den_eval(model=model, pool_points=pool_points, pool_labels=pool_labels, mc_dropout_iterations=self.acquisition_dropout_iterations)
+        pool_var = self.den_eval(model=model,
+                                 pool_points=pool_points,
+                                 pool_labels=pool_labels,
+                                 mc_dropout_iterations=self.acquisition_dropout_iterations)
 
-        return pool_points[torch.argsort(pool_var, descending=True)[:self.acquisition_batch_size]],  pool_labels[torch.argsort(pool_var, descending=True)[:self.acquisition_batch_size]]
+        return pool_points.reshape(-1, self.den.seq_length, 4)[torch.argsort(pool_var, descending=True)[:self.acquisition_batch_size]],  pool_labels[torch.argsort(pool_var, descending=True)[:self.acquisition_batch_size]]
 
     def den_eval(self,
                  model,
@@ -281,4 +288,4 @@ class MCDropoutMaxVarDenTrainer(MCDropoutDenTrainer):
                 predictions[i] = model(pool_points.reshape(-1, self.den.seq_length, 4)).reshape(-1)
         pred_var, preds = torch.var_mean(predictions, dim=0)
 
-        return self.criterion(preds, pool_labels.float()), pred_var
+        return pred_var

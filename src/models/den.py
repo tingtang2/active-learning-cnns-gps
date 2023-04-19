@@ -64,9 +64,6 @@ class GeneratorNetwork(nn.Module):
             if i == 0:
                 x = x.reshape(self.batch_size, 384, 8, 1)
 
-            # if i == 7:
-            #     break
-
             if isinstance(layer, nn.BatchNorm2d):
                 x = F.relu(x)
 
@@ -164,7 +161,7 @@ class Generator(nn.Module):
         sampled_pwm_1 = self.sample_pwm(pwm_logits_upsampled_1)
         sampled_pwm_2 = self.sample_pwm(pwm_logits_upsampled_2)
 
-        return sampled_pwm_1, sampled_pwm_2, sampled_onehot_mask
+        return sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask
 
     def sample_pwm(self, pwm_logits: torch.Tensor) -> torch.Tensor:
         flat_pwm = pwm_logits.reshape(-1, 4)
@@ -207,9 +204,9 @@ class DEN(nn.Module):
         self.trainable_predictor = model_type()
 
     def forward(self):
-        sampled_pwm_1, sampled_pwm_2, sampled_onehot_mask = self.generator()
+        sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask = self.generator()
 
-        return sampled_pwm_1, self.trainable_predictor(sampled_pwm_1.reshape(-1, self.generator.seq_length, 4))
+        return sampled_pwm_1, self.trainable_predictor(sampled_pwm_1.reshape(-1, self.generator.seq_length, 4)), sampled_pwm_2,  pwm_1, onehot_mask, sampled_onehot_mask
 
     def compute_loss(self):
         pass

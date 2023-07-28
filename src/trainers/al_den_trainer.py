@@ -180,11 +180,15 @@ class MCDropoutDenTrainer(DenTrainer):
             logging.info(f'AL iteration: {round + 1}, MSE: {mse[-1]}, len train set: {len(train_pool)}')
 
             sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask = self.den()
-            acquisition_pool_labels = self.oracle(sampled_pwm_1.reshape(-1, self.den.seq_length, 4))
 
+            acquisition_pool_labels = self.oracle(sampled_pwm_1.reshape(-1, self.den.seq_length, 4))
             new_points, new_labels = self.acquisition_fn(pool_points=sampled_pwm_1, pool_labels=acquisition_pool_labels, model=model)
 
+            synthetic_acquired_points[-1][0].detach()
+            synthetic_acquired_points[-1][1].detach()
             synthetic_acquired_points.append((new_points, new_labels))
+            # free my homie
+            model = None
 
         self.save_metrics(mse, iter)
 
@@ -200,7 +204,7 @@ class MCDropoutDenTrainer(DenTrainer):
                 predictions = model(examples.reshape(-1, self.den.seq_length, 4)).reshape(-1)
                 loss = self.criterion(predictions, labels.reshape(-1))
 
-                loss.backward(retain_graph=True)
+                loss.backward()
                 optimizer.step()
 
                 running_loss += loss.item()

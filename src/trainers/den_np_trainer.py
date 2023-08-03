@@ -1,5 +1,15 @@
 from trainers.al_den_trainer import DenTrainer
 from models.np import ConvCNP1d
+import logging
+
+from tqdm import trange
+from typing import Tuple
+
+from timeit import default_timer as timer
+import torch
+
+from scipy.stats import pearsonr, spearmanr
+from torch.utils.data import DataLoader
 
 
 class NpDenTrainer(DenTrainer):
@@ -8,17 +18,20 @@ class NpDenTrainer(DenTrainer):
         super().__init__(**kwargs)
         self.model = ConvCNP1d()
 
+        self.name = 'cnp_x_den'
+
     def train_epoch(self):
         self.den.train()
         running_loss = 0.0
         self.optimizer.zero_grad()
 
         sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask = self.den()
-
         labels = self.oracle(sampled_pwm_1.reshape(-1, self.den.generator.seq_length, 4))
 
-        # TODO: add similarity regularization
-        loss = self.criterion(predictions, labels)
+        # switch context and targets?
+        pred_dist = self.model(xc=self.X_train, yc=self.y_train, xt=sampled_pwm_1)
+
+        loss = -pred_dist.log_prob(labels).sum(-1).mean()
 
         if self.use_regularization:
             # diversity + entropy loss
@@ -34,24 +47,9 @@ class NpDenTrainer(DenTrainer):
         running_loss += loss.item()
         return running_loss
 
-    def train_synthetic_iteration(self, synthetic_pairs, optimizer):
-        self.model.train()
-        self.den.train()
-        for epoch in range(self.epochs):
-            running_loss = 0.0
-            for batch in synthetic_pairs:
-                optimizer.zero_grad()
-                examples, labels = batch
-
-                predictions = model(examples.reshape(-1, self.den.seq_length, 4)).reshape(-1)
-                loss = self.criterion(predictions, labels.reshape(-1))
-
-                loss.backward(retain_graph=True)
-                optimizer.step()
-
-                running_loss += loss.item()
-
     def run_experiment(self):
+        self.load_data(2)
+
         best_val_loss = 1e+5
         early_stopping_counter = 0
 
@@ -77,31 +75,29 @@ class NpDenTrainer(DenTrainer):
             if early_stopping_counter == self.early_stopping_threshold:
                 break
 
-        for round in trange(ceil(self.num_acquisitions / self.acquisition_batch_size)):
-            model = self.model_type(dropout_prob=self.dropout_prob).to(self.device)
+    def eval(self, loader: DataLoader, save_plot=False) -> Tuple[torch.Tensor, object]:
+        """evaluates model on given data loader. computes loss and spearman correlation between predictions and labels
 
-            optimizer = self.optimizer_type([{
-                'params': model.parameters()
-            },
-                                             {
-                                                 'params': self.den.parameters()
-                                             }],
-                                            lr=0.001,
-                                            weight_decay=self.l2_penalty / len(train_pool))
+        Args:
+            loader (DataLoader): data loader containing validation/test data
+            save_plot (bool, optional): whether or not to saved correlation plot. Defaults to False.
 
-            train_dataloader, test_dataloader, _ = create_dataloaders(X_train=X_train_data,
-                                                                              y_train=y_train_data,
-                                                                              X_test=self.X_test,
-                                                                              y_test=self.y_test,
-                                                                              device=self.device)
+        Returns:
+            torch.Tensor: validation loss
+        """
+        self.den.eval()
 
-            # separate out training of normal data and generated data for convenient autograd purposes
-            self.active_train_iteration(model=model,
-                                        train_loader=train_dataloader,
-                                        test_loader=test_dataloader,
-                                        optimizer=optimizer,
-                                        eval=False)
+        predictions = torch.empty(loader.dataset.sequences.size(0)).to(self.device)
+        full_labels: torch.Tensor = loader.dataset.proportions
 
-            self.train_synthetic_iteration(synthetic_pairs=synthetic_acquired_points, model=model, optimizer=optimizer)
+        with torch.no_grad():
+            for j, batch in enumerate(loader):
+                examples, labels = batch
 
-            new_mse, new_var = self.eval(model=model, loader=create_test_dataloader(self.X_test, self.y_test, self.device), mc_dropout_iterations=self.test_dropout_iterations)
+                predictions = self.model(examples).reshape(-1)
+
+        if save_plot:
+            # TODO: do plotting
+            pass
+
+        return self.criterion(predictions, full_labels.float()), spearmanr(predictions.detach().cpu().numpy(), full_labels.detach().cpu().numpy()), pearsonr(predictions.detach().cpu().numpy(), full_labels.detach().cpu().numpy())

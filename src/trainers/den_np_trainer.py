@@ -11,6 +11,8 @@ import torch
 from scipy.stats import pearsonr, spearmanr
 from torch.utils.data import DataLoader
 
+from data.data_loader import create_dataloaders
+
 
 class NpDenTrainer(DenTrainer):
 
@@ -19,43 +21,48 @@ class NpDenTrainer(DenTrainer):
         self.model = ConvCNP1d()
 
         self.name = 'cnp_x_den'
+        self.use_regularization = True
 
-    def train_epoch(self):
+    def train_epoch(self, loader: DataLoader):
         self.den.train()
         running_loss = 0.0
-        self.optimizer.zero_grad()
 
-        sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask = self.den()
-        labels = self.oracle(sampled_pwm_1.reshape(-1, self.den.generator.seq_length, 4))
+        for batch in loader:
+            self.optimizer.zero_grad()
+            true_examples, true_labels = batch
 
-        # switch context and targets?
-        pred_dist = self.model(xc=self.X_train, yc=self.y_train, xt=sampled_pwm_1)
+            sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask = self.den()
+            labels = self.oracle(sampled_pwm_1.reshape(-1, self.den.generator.seq_length, 4))
 
-        loss = -pred_dist.log_prob(labels).sum(-1).mean()
+            # switch context and targets?
+            pred_dist = self.model(xc=sampled_pwm_1, yc=labels, xt=true_examples)
 
-        if self.use_regularization:
-            # diversity + entropy loss
-            loss += self.get_reg_loss(sampled_pwm_1=sampled_pwm_1,
-                                      sampled_pwm_2=sampled_pwm_2,
-                                      pwm_1=pwm_1,
-                                      onehot_mask=onehot_mask,
-                                      sampled_onehot_mask=sampled_onehot_mask)
+            loss = -pred_dist.log_prob(true_labels).sum(-1).mean()
 
-        loss.backward()
-        self.optimizer.step()
+            if self.use_regularization:
+                # diversity + entropy loss
+                loss += self.get_reg_loss(sampled_pwm_1=sampled_pwm_1,
+                                          sampled_pwm_2=sampled_pwm_2,
+                                          pwm_1=pwm_1,
+                                          onehot_mask=onehot_mask,
+                                          sampled_onehot_mask=sampled_onehot_mask)
 
-        running_loss += loss.item()
+            loss.backward()
+            self.optimizer.step()
+
+            running_loss += loss.item()
         return running_loss
 
     def run_experiment(self):
         self.load_data(2)
+        self.train_loader, self.val_loader, self.data_dim = create_dataloaders(X_train=self.X_train, y_train=self.y_train, X_test=self.X_val, y_test=self.y_val, device=self.device)
 
         best_val_loss = 1e+5
         early_stopping_counter = 0
 
         for epoch in trange(1, self.epochs + 1):
             start_time = timer()
-            train_loss = self.train_epoch()
+            train_loss = self.train_epoch(loader=self.train_loader)
             end_time = timer()
 
             val_loss, spearman_res, (pearson_r, _) = self.eval(self.val_loader)

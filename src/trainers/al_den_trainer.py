@@ -34,6 +34,17 @@ class DenTrainer(BaseTrainer):
             param.requires_grad = False
         self.oracle.eval()
 
+        # OLD CONFIGS TODO: FACTOR OUT
+        self.region_1_start = 10
+        self.region_1_end = 35
+        self.region_1_target_bits = 2.0
+        self.region_2_start = 53
+        self.region_2_end = 78
+        self.region_2_target_bits = 2.0
+        self.entropy_weight = 3.5    #2.0,#1.0,
+        self.similarity_weight = 7.5    #5.0,
+        self.similarity_margin = 0.5
+
     def get_reg_loss(self, sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask):
         entropy_loss = self.entropy_weight * (
             self.target_entropy_sme_masked(pwm=pwm_1,

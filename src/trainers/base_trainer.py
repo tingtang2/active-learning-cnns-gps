@@ -2,7 +2,7 @@
 import json
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Optional
 
 import pandas as pd
 import plotly.express as px
@@ -17,11 +17,11 @@ class BaseTrainer(ABC):
     def __init__(self,
                  model_type,
                  optimizer_type,
-                 acquisition_fn_type,
                  criterion,
                  device: str,
                  save_dir: Union[str,
                                  Path],
+                 acquisition_fn_type: Optional[str] = None,
                  save_plots: bool = True,
                  seed: int = 11202022,
                  **kwargs) -> None:
@@ -45,21 +45,21 @@ class BaseTrainer(ABC):
     def load_data(self, iter: int) -> None:
         self.X_train, self.y_train, self.X_test, self.y_test = get_splits(iter)
 
-    @abstractmethod
-    def active_train_loop(self):
-        pass
+    # @abstractmethod
+    # def active_train_loop(self):
+    #     pass
 
-    @abstractmethod
-    def active_train_iteration(self):
-        pass
+    # @abstractmethod
+    # def active_train_iteration(self):
+    #     pass
 
-    @abstractmethod
-    def acquisition_fn(self):
-        pass
+    # @abstractmethod
+    # def acquisition_fn(self):
+    #     pass
 
-    @abstractmethod
-    def eval(self):
-        pass
+    # @abstractmethod
+    # def eval(self):
+    #     pass
 
     def save_metrics(self, metrics: List[float], iter: int):
         save_name = f'{self.acquisition_fn_type}_iteration_{iter}-batch_size-{self.acquisition_batch_size}-refactor-num-acquisitions-{self.num_acquisitions}.json'

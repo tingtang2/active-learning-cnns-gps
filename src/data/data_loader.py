@@ -46,10 +46,10 @@ def get_splits(iter: int = 1):
     return X_train, y_train, X_test, y_test
 
 
-def get_oracle_splits(seed):
+def get_oracle_splits(seed: int, num: int = 1):
     X, y = get_dataset()
 
-    train_indicies = np.load(Path(PATH_TO_DIRECTORY, 'old_data', 'data_indicies', 'trainindices1.npy'))
+    train_indicies = np.load(Path(PATH_TO_DIRECTORY, 'old_data', 'data_indicies', f'trainindices{num}.npy'))
 
     X_not_test, y_not_test = X[train_indicies], y[train_indicies]
     X_train, X_val, y_train, y_val = train_test_split(X_not_test, y_not_test, test_size=26513, random_state=seed)

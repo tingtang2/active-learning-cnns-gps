@@ -11,14 +11,14 @@ import torch
 from scipy.stats import pearsonr, spearmanr
 from torch.utils.data import DataLoader
 
-from data.data_loader import create_dataloaders
+from data.data_loader import get_oracle_splits, create_dataloaders
 
 
 class NpDenTrainer(DenTrainer):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.model = ConvCNP1d()
+        self.model = ConvCNP1d().to(self.device)
 
         self.name = 'cnp_x_den'
         self.use_regularization = True
@@ -32,10 +32,15 @@ class NpDenTrainer(DenTrainer):
             true_examples, true_labels = batch
 
             sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask = self.den()
-            labels = self.oracle(sampled_pwm_1.reshape(-1, self.den.generator.seq_length, 4))
+            labels = self.oracle(sampled_pwm_1.reshape(-1, self.den.seq_length, 4))
 
             # switch context and targets?
-            pred_dist = self.model(xc=sampled_pwm_1, yc=labels, xt=true_examples)
+            pred_dist = self.model(xc=sampled_pwm_1.reshape(self.den.seq_length,
+                                                            -1,
+                                                            4),
+                                   yc=labels.to(self.device),
+                                   xt=true_examples.transpose(1,
+                                                              0).to(self.device))
 
             loss = -pred_dist.log_prob(true_labels).sum(-1).mean()
 
@@ -54,8 +59,8 @@ class NpDenTrainer(DenTrainer):
         return running_loss
 
     def run_experiment(self):
-        self.load_data(2)
-        self.train_loader, self.val_loader, self.data_dim = create_dataloaders(X_train=self.X_train, y_train=self.y_train, X_test=self.X_val, y_test=self.y_val, device=self.device)
+        self.X_train, self.y_train, self.X_val, self.y_val = get_oracle_splits(42, num=2)
+        self.train_loader, self.val_loader, self.data_dim = create_dataloaders(X_train=self.X_train, y_train=self.y_train, X_test=self.X_val, y_test=self.y_val, device=self.device, test_batch_size=self.batch_size)
 
         best_val_loss = 1e+5
         early_stopping_counter = 0
@@ -96,15 +101,30 @@ class NpDenTrainer(DenTrainer):
 
         predictions = torch.empty(loader.dataset.sequences.size(0)).to(self.device)
         full_labels: torch.Tensor = loader.dataset.proportions
+        running_loss = 0
 
         with torch.no_grad():
             for j, batch in enumerate(loader):
-                examples, labels = batch
 
-                predictions = self.model(examples).reshape(-1)
+                true_examples, true_labels = batch
+
+                sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask = self.den()
+                labels = self.oracle(sampled_pwm_1.reshape(-1, self.den.seq_length, 4))
+
+                # switch context and targets?
+                pred_dist = self.model(xc=sampled_pwm_1.reshape(self.den.seq_length,
+                                                                -1,
+                                                                4),
+                                       yc=labels.to(self.device),
+                                       xt=true_examples.transpose(1,
+                                                                  0).to(self.device))
+                running_loss += -pred_dist.log_prob(true_labels).sum(-1).item()
+                # predictions[j * true_examples.size(0):j * true_examples.size(0) + true_examples.size(0)] = pred_dist.loc
 
         if save_plot:
             # TODO: do plotting
             pass
 
-        return self.criterion(predictions, full_labels.float()), spearmanr(predictions.detach().cpu().numpy(), full_labels.detach().cpu().numpy()), pearsonr(predictions.detach().cpu().numpy(), full_labels.detach().cpu().numpy())
+        print(running_loss / predictions.size(0))
+
+        return running_loss/predictions.size(0), spearmanr(predictions.detach().cpu().numpy(), full_labels.detach().cpu().numpy()), pearsonr(predictions.detach().cpu().numpy(), full_labels.detach().cpu().numpy())

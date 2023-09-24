@@ -1,48 +1,77 @@
-from trainers.al_den_trainer import DenTrainer
-from models.np import ConvCNP1d
 import logging
-
-from tqdm import trange
+from timeit import default_timer as timer
 from typing import Tuple
 
-from timeit import default_timer as timer
 import torch
-
+from data.data_loader import create_dataloaders, get_oracle_splits
+from models.conv_cnp import ConvCNP
+from models.resnets import UNet
 from scipy.stats import pearsonr, spearmanr
 from torch.utils.data import DataLoader
+from tqdm import trange
+from trainers.al_den_trainer import DenTrainer
 
-from data.data_loader import get_oracle_splits, create_dataloaders
+from torch.distributions.normal import Normal
+
+
+def gaussian_logpdf(inputs, mean, sigma, reduction=None):
+    """Gaussian log-density.
+
+    Args:
+        inputs (tensor): Inputs.
+        mean (tensor): Mean.
+        sigma (tensor): Standard deviation.
+        reduction (str, optional): Reduction. Defaults to no reduction.
+            Possible values are "sum", "mean", and "batched_mean".
+
+    Returns:
+        tensor: Log-density.
+    """
+    dist = Normal(loc=mean, scale=sigma)
+    logp = dist.log_prob(inputs)
+
+    if not reduction:
+        return logp
+    elif reduction == 'sum':
+        return torch.sum(logp)
+    elif reduction == 'mean':
+        return torch.mean(logp)
+    elif reduction == 'batched_mean':
+        return torch.mean(torch.sum(logp, 1))
+    else:
+        raise RuntimeError(f'Unknown reduction "{reduction}".')
 
 
 class NpDenTrainer(DenTrainer):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.model = ConvCNP1d().to(self.device)
+        self.model = ConvCNP(rho=UNet(), points_per_unit=64, device=self.device).to(self.device)
 
         self.name = 'cnp_x_den'
         self.use_regularization = True
 
     def train_epoch(self, loader: DataLoader):
         self.den.train()
+        self.model.train()
         running_loss = 0.0
 
         for batch in loader:
             self.optimizer.zero_grad()
             true_examples, true_labels = batch
+            print(true_examples.shape)
 
             sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask = self.den()
             labels = self.oracle(sampled_pwm_1.reshape(-1, self.den.seq_length, 4))
 
             # switch context and targets?
-            pred_dist = self.model(xc=sampled_pwm_1.reshape(self.den.seq_length,
-                                                            -1,
-                                                            4),
-                                   yc=labels.to(self.device),
-                                   xt=true_examples.transpose(1,
-                                                              0).to(self.device))
+            y_mean, y_std = self.model(x=sampled_pwm_1.reshape(-1,
+                                                           self.den.seq_length,
+                                                           4),
+                                   y=labels.to(self.device),
+                                   x_out=true_examples.to(self.device))
 
-            loss = -pred_dist.log_prob(true_labels).sum(-1).mean()
+            loss = -gaussian_logpdf(true_labels, y_mean, y_std, 'batched_mean')
 
             if self.use_regularization:
                 # diversity + entropy loss
@@ -98,6 +127,7 @@ class NpDenTrainer(DenTrainer):
             torch.Tensor: validation loss
         """
         self.den.eval()
+        self.model.eval()
 
         predictions = torch.empty(loader.dataset.sequences.size(0)).to(self.device)
         full_labels: torch.Tensor = loader.dataset.proportions
@@ -119,7 +149,8 @@ class NpDenTrainer(DenTrainer):
                                        xt=true_examples.transpose(1,
                                                                   0).to(self.device))
                 running_loss += -pred_dist.log_prob(true_labels).sum(-1).item()
-                # predictions[j * true_examples.size(0):j * true_examples.size(0) + true_examples.size(0)] = pred_dist.loc
+                print(true_examples.size(), pred_dist.loc.size())
+                predictions[j * true_examples.size(0):j * true_examples.size(0) + true_examples.size(0)] = pred_dist.loc
 
         if save_plot:
             # TODO: do plotting

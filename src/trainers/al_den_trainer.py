@@ -122,6 +122,9 @@ class DenTrainer(BaseTrainer):
         else:
             return margin_sample_ent
 
+    def save_model(self, name: str):
+        torch.save(self.model.state_dict(), f'{self.save_dir}models/{name}.pt')
+
 
 class MCDropoutDenTrainer(DenTrainer):
 

@@ -265,7 +265,9 @@ class ConvCNP(nn.Module):
         init_length_scale = 2.0 / self.points_per_unit
 
         # Instantiate encoder
-        self.encoder = ConvDeepSet(out_channels=self.rho.in_channels, init_length_scale=init_length_scale)
+        self.encoder = ConvDeepSet(out_channels=self.rho.in_channels,
+                                   init_length_scale=init_length_scale,
+                                   device=self.device)
 
         # Instantiate mean and standard deviation layers
         self.mean_layer = FinalLayer(in_channels=self.rho.out_channels, init_length_scale=init_length_scale)
@@ -283,8 +285,8 @@ class ConvCNP(nn.Module):
             tuple[tensor]: Means and standard deviations of shape (batch_out, channels_out).
         """
         # Determine the grid on which to evaluate functional representation.
-        x_min = min(torch.min(x).cpu().numpy(), torch.min(x_out).cpu().numpy(), -2.) - 0.1
-        x_max = max(torch.max(x).cpu().numpy(), torch.max(x_out).cpu().numpy(), 2.) + 0.1
+        x_min = min(torch.min(x).detach().cpu().numpy(), torch.min(x_out).detach().cpu().numpy(), -2.) - 0.1
+        x_max = max(torch.max(x).detach().cpu().numpy(), torch.max(x_out).detach().cpu().numpy(), 2.) + 0.1
         num_points = int(to_multiple(self.points_per_unit * (x_max - x_min), self.multiplier))
         x_grid = torch.linspace(x_min, x_max, num_points).to(self.device)
         x_grid = x_grid[None, :, None].repeat(x.shape[0], 1, 1)

@@ -4,6 +4,9 @@ from torch import nn
 import torch
 import torch.nn as nn
 from torch.distributions import MultivariateNormal
+from models.base_modules import MLP
+
+import torch.nn.functional as F
 
 from gpytorch.kernels import RBFKernel, ScaleKernel
 
@@ -84,3 +87,45 @@ class ConvCNP1d(nn.Module):
 
         sigma = self.psi_rho(xt, t).matmul(self.pos(f_sigma)).squeeze()
         return MultivariateNormal(mu, scale_tril=sigma.diag_embed())
+
+
+def make_abs_conv(Conv):
+    """Make a convolution have only positive parameters."""
+
+    class AbsConv(Conv):
+
+        def forward(self, input):
+            return F.conv1d(
+                input,
+                self.weight.abs(),
+                self.bias,
+                self.stride,
+                self.padding,
+                self.dilation,
+                self.groups,
+            )
+
+    return AbsConv
+
+
+# custom ConvCNP for splicing data
+class SplicingConvCNP1d(nn.Module):
+
+    def __init__(self, inducer_net: nn.Module, y_dim: int = 5):
+        super(SplicingConvCNP1d, self).__init__()
+
+        # first conv layer must produce positive vals to be intepreted as density
+        self.initial_conv = make_abs_conv(
+            nn.Conv1d(in_channels=y_dim,
+                      out_channels=y_dim,
+                      groups=y_dim,
+                      kernel_size=11,
+                      padding=11 // 2,
+                      bias=False))
+
+        self.encoder = nn.Sequential(self.initial_conv, inducer_net)
+        self.decoder = MLP()
+
+    def forward(self, x):
+        x = self.encoder(x)
+        return self.decoder(x)

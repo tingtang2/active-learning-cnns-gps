@@ -82,7 +82,7 @@ class MLP(nn.Module):
         self.n_out = n_out
         self.linear = nn.Linear(n_in, n_out)
         self.activation = nn.ReLU() if activation else nn.Identity()
-        self.dropout = SharedDropout(p=dropout)
+        self.dropout = nn.Dropout(p=dropout)
 
         self.reset_parameters()
 

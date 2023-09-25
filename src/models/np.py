@@ -1,9 +1,11 @@
 # Neural process families
+from typing import Union
 from torch import nn
 
 import torch
 import torch.nn as nn
-from torch.distributions import MultivariateNormal
+from torch.distributions import MultivariateNormal, Independent, Normal
+from torch.nn.common_types import _size_1_t
 from models.base_modules import MLP
 
 import torch.nn.functional as F
@@ -89,43 +91,81 @@ class ConvCNP1d(nn.Module):
         return MultivariateNormal(mu, scale_tril=sigma.diag_embed())
 
 
-def make_abs_conv(Conv):
-    """Make a convolution have only positive parameters."""
+class AbsConv1d(nn.Conv1d):
 
-    class AbsConv(Conv):
+    def forward(self, input):
+        return F.conv1d(
+            input,
+            self.weight.abs(),
+            self.bias,
+            self.stride,
+            self.padding,
+            self.dilation,
+            self.groups,
+        )
 
-        def forward(self, input):
-            return F.conv1d(
-                input,
-                self.weight.abs(),
-                self.bias,
-                self.stride,
-                self.padding,
-                self.dilation,
-                self.groups,
-            )
 
-    return AbsConv
+def MultivariateNormalDiag(loc, scale_diag):
+    """Multi variate Gaussian with a diagonal covariance function (on the last dimension)."""
+    if loc.dim() < 1:
+        raise ValueError("loc must be at least one-dimensional.")
+    return Independent(Normal(loc, scale_diag), 1)
 
 
 # custom ConvCNP for splicing data
 class SplicingConvCNP1d(nn.Module):
 
-    def __init__(self, inducer_net: nn.Module, y_dim: int = 5):
+    def __init__(self,
+                 inducer_net: nn.Module,
+                 device: torch.device,
+                 dropout: float = 0.15,
+                 x_dim: int = 5,
+                 r_dim: int = 128):
         super(SplicingConvCNP1d, self).__init__()
 
         # first conv layer must produce positive vals to be intepreted as density
-        self.initial_conv = make_abs_conv(
-            nn.Conv1d(in_channels=y_dim,
-                      out_channels=y_dim,
-                      groups=y_dim,
-                      kernel_size=11,
-                      padding=11 // 2,
-                      bias=False))
+        self.initial_conv = AbsConv1d(in_channels=x_dim,
+                                      out_channels=x_dim,
+                                      groups=x_dim,
+                                      kernel_size=11,
+                                      padding=11 // 2,
+                                      bias=False)
 
-        self.encoder = nn.Sequential(self.initial_conv, inducer_net)
-        self.decoder = MLP()
+        self.encoder = inducer_net
+        self.decoder = nn.Sequential(MLP(n_in=101 * self.encoder.out_channels,
+                                         n_out=32,
+                                         dropout=dropout),
+                                     nn.Linear(in_features=32,
+                                               out_features=1))
+        self.resizer = nn.Linear(2, r_dim)
 
-    def forward(self, x):
-        x = self.encoder(x)
-        return self.decoder(x)
+        self.device = device
+
+    def forward(self, x_c: torch.Tensor, y_c: torch.Tensor, x_t: torch.Tensor):
+        # batch, seq_len, 4 + 1
+        x_c = x_c.transpose(-1, -2)
+
+        # append y and 1, but I don't think we need density channel because we're not making a prediction at each location
+        context_set = torch.cat((x_c,
+                                 torch.ones(x_c.size(0),
+                                            x_c.size(1),
+                                            1).to(self.device) * y_c).to(self.device),
+                                dim=-1)
+        density = torch.ones(context_set.size()).to(self.device)
+
+        func_rep = self.initial_conv(context_set)
+        density = self.initial_conv(density)
+
+        func_rep = func_rep / torch.clamp(density, min=1e-5)    # normalize convolution
+
+        func_rep = torch.cat((func_rep, density), dim=1).transpose(-1, -2)
+
+        func_rep = self.resizer(func_rep)
+        func_rep = self.encoder(func_rep)
+
+        final_rep = torch.cat((func_rep.view(x_t.size(0), -1), x_t.view(x_t.size(0), -1)), dim=-1)
+
+        mu, sigma = self.decoder(final_rep).split(1, dim=-1)
+        sigma = 0.01 + 0.99 * F.softplus(sigma)
+
+        return MultivariateNormalDiag(loc=mu, scale_diag=sigma)

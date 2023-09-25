@@ -4,7 +4,7 @@ from typing import Tuple
 
 import torch
 from data.data_loader import create_dataloaders, get_oracle_splits
-from models.conv_cnp import ConvCNP
+from models.np import SplicingConvCNP1d
 from models.resnets import UNet
 from scipy.stats import pearsonr, spearmanr
 from torch.utils.data import DataLoader
@@ -46,7 +46,7 @@ class NpDenTrainer(DenTrainer):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.model = ConvCNP(rho=UNet(), points_per_unit=64, device=self.device).to(self.device)
+        self.model = SplicingConvCNP1d(inducer_net=UNet(), device=self.device).to(self.device)
 
         self.name = 'cnp_x_den'
         self.use_regularization = True
@@ -65,13 +65,13 @@ class NpDenTrainer(DenTrainer):
             labels = self.oracle(sampled_pwm_1.reshape(-1, self.den.seq_length, 4))
 
             # switch context and targets?
-            y_mean, y_std = self.model(x=sampled_pwm_1.reshape(-1,
-                                                           self.den.seq_length,
-                                                           4),
-                                   y=labels.to(self.device),
-                                   x_out=true_examples.to(self.device))
+            pred_dist = self.model(x_c=sampled_pwm_1.reshape(-1,
+                                                             self.den.seq_length,
+                                                             4),
+                                   y_c=labels.to(self.device),
+                                   x_t=true_examples.to(self.device))
 
-            loss = -gaussian_logpdf(true_labels, y_mean, y_std, 'batched_mean')
+            loss = -pred_dist.log_prob(true_labels).sum(-1).mean()
 
             if self.use_regularization:
                 # diversity + entropy loss
@@ -89,7 +89,7 @@ class NpDenTrainer(DenTrainer):
 
     def run_experiment(self):
         self.X_train, self.y_train, self.X_val, self.y_val = get_oracle_splits(42, num=2)
-        self.train_loader, self.val_loader, self.data_dim = create_dataloaders(X_train=self.X_train, y_train=self.y_train, X_test=self.X_val, y_test=self.y_val, device=self.device, test_batch_size=self.batch_size)
+        self.train_loader, self.val_loader, self.data_dim = create_dataloaders(X_train=self.X_train, y_train=self.y_train, X_test=self.X_val, y_test=self.y_val, device=self.device)#, test_batch_size=self.batch_size)
 
         best_val_loss = 1e+5
         early_stopping_counter = 0

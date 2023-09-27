@@ -131,26 +131,23 @@ class SplicingConvCNP1d(nn.Module):
                                       padding=11 // 2,
                                       bias=False)
 
+        self.resizer = nn.Linear(2 * x_dim, r_dim)
         self.encoder = inducer_net
-        self.decoder = nn.Sequential(MLP(n_in=101 * self.encoder.out_channels,
+        self.decoder = nn.Sequential(MLP(n_in=82324,
                                          n_out=32,
                                          dropout=dropout),
                                      nn.Linear(in_features=32,
-                                               out_features=1))
-        self.resizer = nn.Linear(2, r_dim)
+                                               out_features=2))
 
         self.device = device
 
     def forward(self, x_c: torch.Tensor, y_c: torch.Tensor, x_t: torch.Tensor):
         # batch, seq_len, 4 + 1
         x_c = x_c.transpose(-1, -2)
+        y_c_channel = y_c.repeat(x_c.size(2), 1, 1)
 
         # append y and 1, but I don't think we need density channel because we're not making a prediction at each location
-        context_set = torch.cat((x_c,
-                                 torch.ones(x_c.size(0),
-                                            x_c.size(1),
-                                            1).to(self.device) * y_c).to(self.device),
-                                dim=-1)
+        context_set = torch.cat((x_c, y_c_channel.view(x_c.size(0), 1, -1)), dim=1)
         density = torch.ones(context_set.size()).to(self.device)
 
         func_rep = self.initial_conv(context_set)
@@ -161,7 +158,11 @@ class SplicingConvCNP1d(nn.Module):
         func_rep = torch.cat((func_rep, density), dim=1).transpose(-1, -2)
 
         func_rep = self.resizer(func_rep)
-        func_rep = self.encoder(func_rep)
+
+        func_rep = self.encoder(func_rep.transpose(-1, -2))
+
+        if x_t.size(0) != 128:
+            print(x_t.size(), func_rep.size())
 
         final_rep = torch.cat((func_rep.view(x_t.size(0), -1), x_t.view(x_t.size(0), -1)), dim=-1)
 

@@ -46,7 +46,7 @@ class NpDenTrainer(DenTrainer):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.model = SplicingConvCNP1d(inducer_net=UNet(), device=self.device).to(self.device)
+        self.model = SplicingConvCNP1d(inducer_net=UNet(in_channels=128), device=self.device).to(self.device)
 
         self.name = 'cnp_x_den'
         self.use_regularization = True
@@ -59,7 +59,10 @@ class NpDenTrainer(DenTrainer):
         for batch in loader:
             self.optimizer.zero_grad()
             true_examples, true_labels = batch
-            print(true_examples.shape)
+
+            # skip final leftover batch because problems will occur lol
+            if true_examples.size(0) != self.batch_size:
+                return running_loss
 
             sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask = self.den()
             labels = self.oracle(sampled_pwm_1.reshape(-1, self.den.seq_length, 4))
@@ -89,7 +92,7 @@ class NpDenTrainer(DenTrainer):
 
     def run_experiment(self):
         self.X_train, self.y_train, self.X_val, self.y_val = get_oracle_splits(42, num=2)
-        self.train_loader, self.val_loader, self.data_dim = create_dataloaders(X_train=self.X_train, y_train=self.y_train, X_test=self.X_val, y_test=self.y_val, device=self.device)#, test_batch_size=self.batch_size)
+        self.train_loader, self.val_loader, self.data_dim = create_dataloaders(X_train=self.X_train, y_train=self.y_train, X_test=self.X_val, y_test=self.y_val, device=self.device, batch_size=self.batch_size, test_batch_size=self.batch_size)
 
         best_val_loss = 1e+5
         early_stopping_counter = 0
@@ -129,33 +132,37 @@ class NpDenTrainer(DenTrainer):
         self.den.eval()
         self.model.eval()
 
-        predictions = torch.empty(loader.dataset.sequences.size(0)).to(self.device)
-        full_labels: torch.Tensor = loader.dataset.proportions
+        predictions = []
         running_loss = 0
 
         with torch.no_grad():
             for j, batch in enumerate(loader):
 
                 true_examples, true_labels = batch
+                if true_examples.size(0) != self.batch_size:
+                    continue
 
                 sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask = self.den()
                 labels = self.oracle(sampled_pwm_1.reshape(-1, self.den.seq_length, 4))
 
                 # switch context and targets?
-                pred_dist = self.model(xc=sampled_pwm_1.reshape(self.den.seq_length,
-                                                                -1,
-                                                                4),
-                                       yc=labels.to(self.device),
-                                       xt=true_examples.transpose(1,
-                                                                  0).to(self.device))
+                pred_dist = self.model(x_c=sampled_pwm_1.reshape(-1,
+                                                                 self.den.seq_length,
+                                                                 4),
+                                       y_c=labels.to(self.device),
+                                       x_t=true_examples.to(self.device))
                 running_loss += -pred_dist.log_prob(true_labels).sum(-1).item()
-                print(true_examples.size(), pred_dist.loc.size())
-                predictions[j * true_examples.size(0):j * true_examples.size(0) + true_examples.size(0)] = pred_dist.loc
+                predictions.append(pred_dist.base_dist.loc)
 
         if save_plot:
             # TODO: do plotting
             pass
 
-        print(running_loss / predictions.size(0))
+        predictions = torch.cat(predictions, dim=0).squeeze()
+        full_labels: torch.Tensor = loader.dataset.proportions[:predictions.size(0)]
+
+        # print('val loss:', running_loss / predictions.size(0))
+        # print('full_labels', full_labels[:5], full_labels.dtype, full_labels.size())
+        # print('predictions', predictions[:5], predictions.dtype, predictions.size())
 
         return running_loss/predictions.size(0), spearmanr(predictions.detach().cpu().numpy(), full_labels.detach().cpu().numpy()), pearsonr(predictions.detach().cpu().numpy(), full_labels.detach().cpu().numpy())

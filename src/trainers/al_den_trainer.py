@@ -24,6 +24,7 @@ class DenTrainer(BaseTrainer):
         self.den = Generator(embedding_template,
                              embedding_mask,
                              self.device,
+                             n_samples=10,
                              seq_length=101,
                              n_classes=1).to(self.device)
         self.optimizer = self.optimizer_type(self.den.parameters(), lr=self.learning_rate)

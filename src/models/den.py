@@ -22,7 +22,7 @@ class GeneratorNetwork(nn.Module):
         self.latent_dim = latent_dim
 
         # Policy/generator network definition
-        dense_0 = nn.Linear(in_features=self.latent_dim + self.n_classes, out_features=8 * 384)
+        dense_0 = nn.Linear(in_features=self.latent_dim + self.n_classes, out_features=9 * 384) # to match original specs
 
         deconv_0 = nn.ConvTranspose2d(in_channels=384, out_channels=256, kernel_size=(7, 1), stride=(2, 1))
         batch_norm_0 = nn.BatchNorm2d(num_features=256)
@@ -62,7 +62,7 @@ class GeneratorNetwork(nn.Module):
 
             # reshape for 2D ops
             if i == 0:
-                x = x.reshape(self.batch_size, 384, 8, 1)
+                x = x.reshape(self.batch_size, 384, 9, 1)
 
             if isinstance(layer, nn.BatchNorm2d):
                 x = F.relu(x)

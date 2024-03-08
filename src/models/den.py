@@ -108,11 +108,12 @@ class Generator(nn.Module):
 
     def forward(self, random_seed: int = None):
         # Seed class input for all dense/embedding layers
-        sequence_class = torch.randint(low=0,
-                                       high=self.n_classes,
-                                       size=(self.batch_size,
-                                             ),
-                                       dtype=torch.int32).to(self.device)
+        sequence_class = torch.empty(self.batch_size).to(self.device)
+        
+        # TODO: Super jank, refactor this...
+        sequence_class.uniform_(-0.499, self.n_classes-0.5001)
+        sequence_class = torch.round(sequence_class).int()
+        # sequence_class = torch.ones(self.batch_size, dtype=torch.int32).to(self.device)
 
         # Get generated policy pwm logits (non-masked)
         latent_input_1 = torch.empty((self.batch_size, self.latent_dim)).to(self.device)
@@ -124,6 +125,7 @@ class Generator(nn.Module):
         sequence_class_onehots = torch.eye(self.n_classes).to(self.device)
 
         class_embedding = sequence_class_onehots.index_select(0, index=sequence_class)    # tf.gather equivalent
+        # class_embedding = torch.zeros(self.batch_size, 1, dtype=torch.int32).to(self.device)
 
         seed_input_1 = torch.cat([latent_input_1, class_embedding], dim=-1)
         seed_input_2 = torch.cat([latent_input_2, class_embedding], dim=-1)
@@ -135,8 +137,8 @@ class Generator(nn.Module):
         onehot_mask = self.onehot_mask_layer(sequence_class).reshape(self.batch_size, self.seq_length, 4, 1)
 
         # Add Template and Multiply Mask
-        pwm_logits_1 = raw_logits_1 * onehot_mask + onehot_template
-        pwm_logits_2 = raw_logits_2 * onehot_mask + onehot_template
+        pwm_logits_1 = (raw_logits_1 * onehot_mask) + onehot_template
+        pwm_logits_2 = (raw_logits_2 * onehot_mask) + onehot_template
 
         # Compute PWMs (Nucleotide-wise Softmax)
         pwm_1 = F.softmax(pwm_logits_1, dim=-2)
@@ -161,7 +163,7 @@ class Generator(nn.Module):
         sampled_pwm_1 = self.sample_pwm(pwm_logits_upsampled_1)
         sampled_pwm_2 = self.sample_pwm(pwm_logits_upsampled_2)
 
-        return sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask
+        return sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask, pwm_logits_1, raw_logits_1, onehot_template
 
     def sample_pwm(self, pwm_logits: torch.Tensor) -> torch.Tensor:
         flat_pwm = pwm_logits.reshape(-1, 4)

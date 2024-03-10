@@ -25,19 +25,19 @@ class GeneratorNetwork(nn.Module):
         dense_0 = nn.Linear(in_features=self.latent_dim + self.n_classes, out_features=9 * 384) # to match original specs
 
         deconv_0 = nn.ConvTranspose2d(in_channels=384, out_channels=256, kernel_size=(7, 1), stride=(2, 1))
-        batch_norm_0 = nn.BatchNorm2d(num_features=256)
+        batch_norm_0 = nn.BatchNorm2d(num_features=256, momentum=.99)
 
         deconv_1 = nn.ConvTranspose2d(in_channels=256, out_channels=192, kernel_size=(8, 1), stride=(2, 1))
-        batch_norm_1 = nn.BatchNorm2d(num_features=192)
+        batch_norm_1 = nn.BatchNorm2d(num_features=192, momentum=0.99)
 
         deconv_2 = nn.ConvTranspose2d(in_channels=192, out_channels=128, kernel_size=(7, 1), stride=(2, 1))
-        batch_norm_2 = nn.BatchNorm2d(num_features=128)
+        batch_norm_2 = nn.BatchNorm2d(num_features=128, momentum=0.99)
 
         conv_3 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=(8, 1), stride=(1, 1), padding='same')
-        batch_norm_3 = nn.BatchNorm2d(num_features=128)
+        batch_norm_3 = nn.BatchNorm2d(num_features=128, momentum=0.99)
 
         conv_4 = nn.Conv2d(in_channels=128, out_channels=64, kernel_size=(8, 1), stride=(1, 1), padding='same')
-        batch_norm_4 = nn.BatchNorm2d(num_features=64)
+        batch_norm_4 = nn.BatchNorm2d(num_features=64, momentum=0.99)
 
         conv_5 = nn.Conv2d(in_channels=64, out_channels=4, kernel_size=(8, 1), stride=(1, 1), padding='same')
 
@@ -124,6 +124,7 @@ class Generator(nn.Module):
 
         sequence_class_onehots = torch.eye(self.n_classes).to(self.device)
 
+        # check here for bugs
         class_embedding = sequence_class_onehots.index_select(0, index=sequence_class)    # tf.gather equivalent
         # class_embedding = torch.zeros(self.batch_size, 1, dtype=torch.int32).to(self.device)
 
@@ -147,9 +148,11 @@ class Generator(nn.Module):
         # Sample proper One-hot coded sequences from PWMs
         # Optionally tile each PWM to sample from and create sample axis
 
+        # check here for bugs
         pwm_logits_upsampled_1 = torch.tile(pwm_logits_1, (self.n_samples, 1, 1, 1))
         pwm_logits_upsampled_2 = torch.tile(pwm_logits_2, (self.n_samples, 1, 1, 1))
 
+        # check here for bugs
         sampled_onehot_mask = torch.tile(onehot_mask,
                                          (self.n_samples,
                                           1,
@@ -160,6 +163,7 @@ class Generator(nn.Module):
                                                       4,
                                                       1)
 
+        # check here for bugs
         sampled_pwm_1 = self.sample_pwm(pwm_logits_upsampled_1)
         sampled_pwm_2 = self.sample_pwm(pwm_logits_upsampled_2)
 

@@ -64,7 +64,7 @@ class GeneratorNetwork(nn.Module):
             if i == 0:
                 x = x.reshape(self.batch_size, 384, 9, 1)
 
-            if isinstance(layer, nn.BatchNorm2d):
+            if isinstance(layer, nn.BatchNorm2d) or isinstance(layer, nn.Linear):
                 x = F.relu(x)
 
         return x.reshape(self.batch_size, self.seq_length, 4, 1)

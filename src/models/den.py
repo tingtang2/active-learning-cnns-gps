@@ -60,12 +60,13 @@ class GeneratorNetwork(nn.Module):
         for i, layer in enumerate(self.generator_network):
             x = layer(x)
 
+            if isinstance(layer, nn.BatchNorm2d) or isinstance(layer, nn.Linear):
+                x = F.relu(x)
+            
             # reshape for 2D ops
             if i == 0:
                 x = x.reshape(self.batch_size, 384, 9, 1)
 
-            if isinstance(layer, nn.BatchNorm2d) or isinstance(layer, nn.Linear):
-                x = F.relu(x)
 
         return x.reshape(self.batch_size, self.seq_length, 4, 1)
 

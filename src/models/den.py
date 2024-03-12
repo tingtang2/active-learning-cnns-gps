@@ -24,13 +24,13 @@ class GeneratorNetwork(nn.Module):
         # Policy/generator network definition
         dense_0 = nn.Linear(in_features=self.latent_dim + self.n_classes, out_features=9 * 384) # to match original specs
 
-        deconv_0 = nn.ConvTranspose2d(in_channels=384, out_channels=256, kernel_size=(7, 1), stride=(2, 1))
+        deconv_0 = nn.ConvTranspose2d(in_channels=384, out_channels=256, kernel_size=(7, 1), stride=(2, 1), bias=True)
         batch_norm_0 = nn.BatchNorm2d(num_features=256, momentum=.99)
 
-        deconv_1 = nn.ConvTranspose2d(in_channels=256, out_channels=192, kernel_size=(8, 1), stride=(2, 1))
+        deconv_1 = nn.ConvTranspose2d(in_channels=256, out_channels=192, kernel_size=(8, 1), stride=(2, 1), bias=True)
         batch_norm_1 = nn.BatchNorm2d(num_features=192, momentum=0.99)
 
-        deconv_2 = nn.ConvTranspose2d(in_channels=192, out_channels=128, kernel_size=(7, 1), stride=(2, 1))
+        deconv_2 = nn.ConvTranspose2d(in_channels=192, out_channels=128, kernel_size=(7, 1), stride=(2, 1), bias=True)
         batch_norm_2 = nn.BatchNorm2d(num_features=128, momentum=0.99)
 
         conv_3 = nn.Conv2d(in_channels=128, out_channels=128, kernel_size=(8, 1), stride=(1, 1), padding='same')

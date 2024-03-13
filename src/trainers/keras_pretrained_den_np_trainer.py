@@ -84,8 +84,8 @@ class PretrainedDenNpTrainer(BaseTrainer):
             true_examples, true_labels = batch
 
             # skip final leftover batch because problems will occur lol
-            # if true_examples.size(0) != self.batch_size:
-            #     return running_loss
+            if true_examples.size(0) != self.batch_size:
+                return running_loss
 
             # switch context and targets?
             pred_dist = self.model(x_c=generated_sequences.view(-1, self.generated_sequence_length, 4),
@@ -98,7 +98,7 @@ class PretrainedDenNpTrainer(BaseTrainer):
             self.optimizer.step()
 
             running_loss += loss.item()
-        return running_loss
+        return running_loss/len(loader.dataset)
 
     def run_experiment(self):
         self.X_train, self.y_train, self.X_val, self.y_val = get_oracle_splits(42, num=2)
@@ -150,8 +150,8 @@ class PretrainedDenNpTrainer(BaseTrainer):
             for j, batch in enumerate(loader):
 
                 true_examples, true_labels = batch
-                # if true_examples.size(0) != self.batch_size:
-                #     continue
+                if true_examples.size(0) != self.batch_size:
+                    continue
 
                 # switch context and targets?
                 pred_dist = self.model(x_c=generated_sequences.view(-1,
@@ -169,8 +169,11 @@ class PretrainedDenNpTrainer(BaseTrainer):
         predictions = torch.cat(predictions, dim=0).squeeze()
         full_labels: torch.Tensor = loader.dataset.proportions[:predictions.size(0)]
 
-        # print('val loss:', running_loss / predictions.size(0))
-        # print('full_labels', full_labels[:5], full_labels.dtype, full_labels.size())
-        # print('predictions', predictions[:5], predictions.dtype, predictions.size())
+        print('val loss:', running_loss / predictions.size(0))
+        print('full_labels', full_labels[:5], full_labels.dtype, full_labels.size())
+        print('predictions', predictions[:5], predictions.dtype, predictions.size())
 
         return running_loss/predictions.size(0), spearmanr(predictions.detach().cpu().numpy(), full_labels.detach().cpu().numpy()), pearsonr(predictions.detach().cpu().numpy(), full_labels.detach().cpu().numpy())
+
+    def save_model(self, name: str):
+        torch.save(self.model.state_dict(), f'{self.save_dir}models/{name}.pt')

@@ -11,7 +11,7 @@ from trainers.den_np_trainer import NpDenTrainer
 from trainers.keras_pretrained_den_np_trainer import PretrainedDenNpTrainer
 
 arg_optimizer_map = {'rmsprop': RMSprop, 'adamw': AdamW}
-# trainer_map = {'den_np'}
+trainer_map = {'den_np': NpDenTrainer, 'pretrained_keras_den_np': PretrainedDenNpTrainer}
 
 
 def main() -> int:
@@ -36,6 +36,7 @@ def main() -> int:
         '--oracle_save_path',
         default='/gpfs/commons/home/tchen/al_project/active-learning-save/saved_metrics/models/base_cnn_oracle.pt',
         help='path to saved oracle pt file')
+    parser.add_argument('--trainer_type', default='pretrained_keras_den_np', help='type of trainer to use')
     parser.add_argument('--model_type', default='cnn', help='type of model to use')
     parser.add_argument('--optimizer', default='adamw', help='type of optimizer to use')
     parser.add_argument('--num_repeats', default=1, type=int, help='number of times to repeat experiment')
@@ -49,7 +50,7 @@ def main() -> int:
     torch.manual_seed(configs['seed'])
 
     # set up logging
-    filename = f'keras-pretrained-den-np-{date.today()}'
+    filename = f'{configs["trainer_type"]}-{date.today()}'
     FORMAT = '%(asctime)s;%(levelname)s;%(message)s'
     logging.basicConfig(level=logging.DEBUG,
                         filename=f'{configs["log_save_dir"]}{filename}.log',
@@ -58,7 +59,7 @@ def main() -> int:
     logging.info(configs)
 
     # get trainer
-    trainer_type = PretrainedDenNpTrainer
+    trainer_type = trainer_map[configs['trainer_type']]
     trainer = trainer_type(optimizer_type=arg_optimizer_map[configs['optimizer']], criterion=MSELoss(), **configs)
 
     # perform experiment n times

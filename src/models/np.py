@@ -133,7 +133,7 @@ class SplicingConvCNP1d(nn.Module):
 
         self.resizer = nn.Linear(2 * x_dim, r_dim)
         self.encoder = inducer_net
-        self.decoder = nn.Sequential(MLP(n_in=410004,
+        self.decoder = nn.Sequential(MLP(n_in=82324,
                                          n_out=32,
                                          dropout=dropout),
                                      nn.Linear(in_features=32,

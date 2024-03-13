@@ -27,7 +27,6 @@ class DenTrainer(BaseTrainer):
                              n_samples=10,
                              seq_length=101,
                              n_classes=1).to(self.device)
-        self.optimizer = self.optimizer_type(self.den.parameters(), lr=self.learning_rate)
 
         self.oracle = OracleCNN().to(self.device)
         self.oracle.load_state_dict(torch.load(oracle_save_path))

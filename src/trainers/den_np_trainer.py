@@ -88,11 +88,13 @@ class NpDenTrainer(DenTrainer):
             self.optimizer.step()
 
             running_loss += loss.item()
-        return running_loss
+        return running_loss/len(loader.dataset)
 
     def run_experiment(self):
         self.X_train, self.y_train, self.X_val, self.y_val = get_oracle_splits(42, num=2)
         self.train_loader, self.val_loader, self.data_dim = create_dataloaders(X_train=self.X_train, y_train=self.y_train, X_test=self.X_val, y_test=self.y_val, device=self.device, batch_size=self.batch_size, test_batch_size=self.batch_size)
+        
+        self.optimizer = self.optimizer_type(list(self.den.parameters()) + list(self.model.parameters()), lr=self.learning_rate)
 
         best_val_loss = 1e+5
         early_stopping_counter = 0
@@ -161,8 +163,8 @@ class NpDenTrainer(DenTrainer):
         predictions = torch.cat(predictions, dim=0).squeeze()
         full_labels: torch.Tensor = loader.dataset.proportions[:predictions.size(0)]
 
-        # print('val loss:', running_loss / predictions.size(0))
-        # print('full_labels', full_labels[:5], full_labels.dtype, full_labels.size())
-        # print('predictions', predictions[:5], predictions.dtype, predictions.size())
+        print('val loss:', running_loss / predictions.size(0))
+        print('full_labels', full_labels[:5], full_labels.dtype, full_labels.size())
+        print('predictions', predictions[:5], predictions.dtype, predictions.size())
 
         return running_loss/predictions.size(0), spearmanr(predictions.detach().cpu().numpy(), full_labels.detach().cpu().numpy()), pearsonr(predictions.detach().cpu().numpy(), full_labels.detach().cpu().numpy())

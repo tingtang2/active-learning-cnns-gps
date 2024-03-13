@@ -21,7 +21,7 @@ def main() -> int:
     parser.add_argument('--batch_size', default=128, type=int, help='mini-batch size used to train model')
     parser.add_argument('--dropout_prob', default=0.15, type=float, help='probability for dropout before dense layers')
     parser.add_argument('--l2_penalty', default=0.025, type=float, help='l2 penalty to start out with')
-    parser.add_argument('--learning_rate', default=1e-3, type=float, help='learning rate for optimizer')
+    parser.add_argument('--learning_rate', default=1e-4, type=float, help='learning rate for optimizer')
     parser.add_argument('--early_stopping_threshold',
                         default=10,
                         type=int,

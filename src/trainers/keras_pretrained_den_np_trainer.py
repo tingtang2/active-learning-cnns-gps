@@ -10,8 +10,7 @@ from torch.utils.data import DataLoader
 from tqdm import trange
 
 from data.data_loader import create_dataloaders, get_oracle_splits
-from models.keras_pretrained_den import (KerasPretrainedDENPredictor,
-                                         target_isos)
+from models.keras_pretrained_den import (KerasPretrainedDENPredictor, target_isos)
 from models.np import SplicingConvCNP1d
 from models.resnets import UNet
 from trainers.base_trainer import BaseTrainer
@@ -49,7 +48,9 @@ class PretrainedDenNpTrainer(BaseTrainer):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.model = SplicingConvCNP1d(inducer_net=UNet(in_channels=128), device=self.device).to(self.device)
+        self.model = SplicingConvCNP1d(inducer_net=UNet(in_channels=128),
+                                       device=self.device,
+                                       seq_len=109).to(self.device)
         self.pretrained_dens = {
             target_iso:
                 KerasPretrainedDENPredictor(
@@ -75,7 +76,7 @@ class PretrainedDenNpTrainer(BaseTrainer):
         return torch.from_numpy(np.concatenate(total_sequences)).to(self.device), torch.from_numpy(np.concatenate(total_labels)).to(self.device)
 
     def train_epoch(self, loader: DataLoader):
-        generated_sequences, generated_labels =  self.generate_sequences()
+        generated_sequences, generated_labels = self.generate_sequences()
         self.model.train()
         running_loss = 0.0
 
@@ -88,7 +89,9 @@ class PretrainedDenNpTrainer(BaseTrainer):
                 return running_loss
 
             # switch context and targets?
-            pred_dist = self.model(x_c=generated_sequences.view(-1, self.generated_sequence_length, 4),
+            pred_dist = self.model(x_c=generated_sequences.view(-1,
+                                                                self.generated_sequence_length,
+                                                                4),
                                    y_c=generated_labels.to(self.device),
                                    x_t=true_examples.to(self.device))
 
@@ -98,7 +101,7 @@ class PretrainedDenNpTrainer(BaseTrainer):
             self.optimizer.step()
 
             running_loss += loss.item()
-        return running_loss/len(loader.dataset)
+        return running_loss / len(loader.dataset)
 
     def run_experiment(self):
         self.X_train, self.y_train, self.X_val, self.y_val = get_oracle_splits(42, num=2)
@@ -140,7 +143,7 @@ class PretrainedDenNpTrainer(BaseTrainer):
         Returns:
             torch.Tensor: validation loss
         """
-        generated_sequences, generated_labels =  self.generate_sequences()
+        generated_sequences, generated_labels = self.generate_sequences()
         self.model.eval()
 
         predictions = []
@@ -155,8 +158,8 @@ class PretrainedDenNpTrainer(BaseTrainer):
 
                 # switch context and targets?
                 pred_dist = self.model(x_c=generated_sequences.view(-1,
-                                                                 self.generated_sequence_length,
-                                                                 4),
+                                                                    self.generated_sequence_length,
+                                                                    4),
                                        y_c=generated_labels.to(self.device),
                                        x_t=true_examples.to(self.device))
                 running_loss += -pred_dist.log_prob(true_labels).sum(-1).item()

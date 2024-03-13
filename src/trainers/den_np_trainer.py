@@ -88,13 +88,14 @@ class NpDenTrainer(DenTrainer):
             self.optimizer.step()
 
             running_loss += loss.item()
-        return running_loss/len(loader.dataset)
+        return running_loss / len(loader.dataset)
 
     def run_experiment(self):
         self.X_train, self.y_train, self.X_val, self.y_val = get_oracle_splits(42, num=2)
         self.train_loader, self.val_loader, self.data_dim = create_dataloaders(X_train=self.X_train, y_train=self.y_train, X_test=self.X_val, y_test=self.y_val, device=self.device, batch_size=self.batch_size, test_batch_size=self.batch_size)
-        
-        self.optimizer = self.optimizer_type(list(self.den.parameters()) + list(self.model.parameters()), lr=self.learning_rate)
+
+        self.optimizer = self.optimizer_type(list(self.den.parameters()) + list(self.model.parameters()),
+                                             lr=self.learning_rate)
 
         best_val_loss = 1e+5
         early_stopping_counter = 0

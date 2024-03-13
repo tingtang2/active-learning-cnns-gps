@@ -22,7 +22,8 @@ class GeneratorNetwork(nn.Module):
         self.latent_dim = latent_dim
 
         # Policy/generator network definition
-        dense_0 = nn.Linear(in_features=self.latent_dim + self.n_classes, out_features=8 * 384) # to match original specs
+        dense_0 = nn.Linear(in_features=self.latent_dim + self.n_classes,
+                            out_features=8 * 384)    # to match original specs
 
         deconv_0 = nn.ConvTranspose2d(in_channels=384, out_channels=256, kernel_size=(7, 1), stride=(2, 1), bias=True)
         batch_norm_0 = nn.BatchNorm2d(num_features=256, momentum=.99)
@@ -62,11 +63,10 @@ class GeneratorNetwork(nn.Module):
 
             if isinstance(layer, nn.BatchNorm2d) or isinstance(layer, nn.Linear):
                 x = F.relu(x)
-            
+
             # reshape for 2D ops
             if i == 0:
                 x = x.view(self.batch_size, 384, 8, 1)
-
 
         return x.view(self.batch_size, self.seq_length, 4, 1)
 
@@ -110,9 +110,9 @@ class Generator(nn.Module):
     def forward(self, random_seed: int = None):
         # Seed class input for all dense/embedding layers
         sequence_class = torch.empty(self.batch_size).to(self.device)
-        
+
         # TODO: Super jank, refactor this...
-        sequence_class.uniform_(-0.499, self.n_classes-0.5001)
+        sequence_class.uniform_(-0.499, self.n_classes - 0.5001)
         sequence_class = torch.round(sequence_class).int()
         # sequence_class = torch.ones(self.batch_size, dtype=torch.int32).to(self.device)
 

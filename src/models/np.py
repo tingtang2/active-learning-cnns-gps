@@ -120,7 +120,8 @@ class SplicingConvCNP1d(nn.Module):
                  device: torch.device,
                  dropout: float = 0.15,
                  x_dim: int = 5,
-                 r_dim: int = 128):
+                 r_dim: int = 128,
+                 seq_len: int = 101):
         super(SplicingConvCNP1d, self).__init__()
 
         # first conv layer must produce positive vals to be intepreted as density
@@ -133,7 +134,15 @@ class SplicingConvCNP1d(nn.Module):
 
         self.resizer = nn.Linear(2 * x_dim, r_dim)
         self.encoder = inducer_net
-        self.decoder = nn.Sequential(MLP(n_in=82324,
+
+        # TODO: think of a better way to set input dimensionality
+        input_dim = -1
+        if seq_len == 101:
+            input_dim = 82324
+        elif seq_len == 109:
+            input_dim == 410004
+
+        self.decoder = nn.Sequential(MLP(n_in=input_dim,
                                          n_out=32,
                                          dropout=dropout),
                                      nn.Linear(in_features=32,

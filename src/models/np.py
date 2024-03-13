@@ -140,7 +140,7 @@ class SplicingConvCNP1d(nn.Module):
         if seq_len == 101:
             input_dim = 82324
         elif seq_len == 109:
-            input_dim == 410004
+            input_dim = 410004
 
         self.decoder = nn.Sequential(MLP(n_in=input_dim,
                                          n_out=32,

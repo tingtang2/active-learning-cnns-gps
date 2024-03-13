@@ -8,8 +8,10 @@ from torch.nn import MSELoss
 from torch.optim import AdamW, RMSprop
 
 from trainers.den_np_trainer import NpDenTrainer
+from trainers.keras_pretrained_den_np_trainer import PretrainedDenNpTrainer
 
 arg_optimizer_map = {'rmsprop': RMSprop, 'adamw': AdamW}
+# trainer_map = {'den_np'}
 
 
 def main() -> int:
@@ -47,7 +49,7 @@ def main() -> int:
     torch.manual_seed(configs['seed'])
 
     # set up logging
-    filename = f'den-np-{date.today()}'
+    filename = f'keras-pretrained-den-np-{date.today()}'
     FORMAT = '%(asctime)s;%(levelname)s;%(message)s'
     logging.basicConfig(level=logging.DEBUG,
                         filename=f'{configs["log_save_dir"]}{filename}.log',
@@ -56,7 +58,7 @@ def main() -> int:
     logging.info(configs)
 
     # get trainer
-    trainer_type = NpDenTrainer
+    trainer_type = PretrainedDenNpTrainer
     trainer = trainer_type(optimizer_type=arg_optimizer_map[configs['optimizer']], criterion=MSELoss(), **configs)
 
     # perform experiment n times

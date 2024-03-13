@@ -2,17 +2,19 @@ import logging
 from timeit import default_timer as timer
 from typing import Tuple
 
+import numpy as np
 import torch
-from data.data_loader import create_dataloaders, get_oracle_splits
-from models.np import SplicingConvCNP1d
-from models.resnets import UNet
 from scipy.stats import pearsonr, spearmanr
+from torch.distributions.normal import Normal
 from torch.utils.data import DataLoader
 from tqdm import trange
-from trainers.base_trainer import BaseTrainer
-from models.keras_pretrained_den import KerasPretrainedDENPredictor, target_isos
 
-from torch.distributions.normal import Normal
+from data.data_loader import create_dataloaders, get_oracle_splits
+from models.keras_pretrained_den import (KerasPretrainedDENPredictor,
+                                         target_isos)
+from models.np import SplicingConvCNP1d
+from models.resnets import UNet
+from trainers.base_trainer import BaseTrainer
 
 
 def gaussian_logpdf(inputs, mean, sigma, reduction=None):
@@ -48,13 +50,32 @@ class PretrainedDenNpTrainer(BaseTrainer):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         self.model = SplicingConvCNP1d(inducer_net=UNet(in_channels=128), device=self.device).to(self.device)
-        self.pretrained_den = KerasPretrainedDENPredictor(seed=self.seed, batch_size=32, path='')
+        self.pretrained_dens = {
+            target_iso:
+                KerasPretrainedDENPredictor(
+                    seed=self.seed,
+                    batch_size=32,
+                    path='/gpfs/commons/groups/knowles_lab/ting/DEN_splicing_pretrained_models/',
+                    target_iso=target_iso) for target_iso in target_isos
+        }
+        self.generated_sequence_length = 109
 
-        self.name = 'cnp_x_den'
+        self.name = 'cnp_x_keras_dens'
         self.use_regularization = True
 
+    def generate_sequences(self) -> Tuple[torch.Tensor, torch.Tensor]:
+        total_sequences = []
+        total_labels = []
+
+        for target_iso in target_isos:
+            sequences, labels = self.pretrained_dens[target_iso].generate_sequences_and_labels()
+            total_sequences.append(sequences)
+            total_labels.append(labels)
+
+        return torch.from_numpy(np.concatenate(total_sequences)).to(self.device), torch.from_numpy(np.concatenate(total_labels)).to(self.device)
+
     def train_epoch(self, loader: DataLoader):
-        self.den.train()
+        generated_sequences, generated_labels =  self.generate_sequences()
         self.model.train()
         running_loss = 0.0
 
@@ -63,28 +84,15 @@ class PretrainedDenNpTrainer(BaseTrainer):
             true_examples, true_labels = batch
 
             # skip final leftover batch because problems will occur lol
-            if true_examples.size(0) != self.batch_size:
-                return running_loss
-
-            sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask = self.den()
-            labels = self.oracle(sampled_pwm_1.reshape(-1, self.den.seq_length, 4))
+            # if true_examples.size(0) != self.batch_size:
+            #     return running_loss
 
             # switch context and targets?
-            pred_dist = self.model(x_c=sampled_pwm_1.reshape(-1,
-                                                             self.den.seq_length,
-                                                             4),
-                                   y_c=labels.to(self.device),
+            pred_dist = self.model(x_c=generated_sequences.view(-1, self.generated_sequence_length, 4),
+                                   y_c=generated_labels.to(self.device),
                                    x_t=true_examples.to(self.device))
 
             loss = -pred_dist.log_prob(true_labels).sum(-1).mean()
-
-            if self.use_regularization:
-                # diversity + entropy loss
-                loss += self.get_reg_loss(sampled_pwm_1=sampled_pwm_1,
-                                          sampled_pwm_2=sampled_pwm_2,
-                                          pwm_1=pwm_1,
-                                          onehot_mask=onehot_mask,
-                                          sampled_onehot_mask=sampled_onehot_mask)
 
             loss.backward()
             self.optimizer.step()
@@ -95,6 +103,7 @@ class PretrainedDenNpTrainer(BaseTrainer):
     def run_experiment(self):
         self.X_train, self.y_train, self.X_val, self.y_val = get_oracle_splits(42, num=2)
         self.train_loader, self.val_loader, self.data_dim = create_dataloaders(X_train=self.X_train, y_train=self.y_train, X_test=self.X_val, y_test=self.y_val, device=self.device, batch_size=self.batch_size, test_batch_size=self.batch_size)
+        self.optimizer = self.optimizer_type(self.model.parameters(), lr=self.learning_rate)
 
         best_val_loss = 1e+5
         early_stopping_counter = 0
@@ -131,7 +140,7 @@ class PretrainedDenNpTrainer(BaseTrainer):
         Returns:
             torch.Tensor: validation loss
         """
-        self.den.eval()
+        generated_sequences, generated_labels =  self.generate_sequences()
         self.model.eval()
 
         predictions = []
@@ -141,17 +150,14 @@ class PretrainedDenNpTrainer(BaseTrainer):
             for j, batch in enumerate(loader):
 
                 true_examples, true_labels = batch
-                if true_examples.size(0) != self.batch_size:
-                    continue
-
-                sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask = self.den()
-                labels = self.oracle(sampled_pwm_1.reshape(-1, self.den.seq_length, 4))
+                # if true_examples.size(0) != self.batch_size:
+                #     continue
 
                 # switch context and targets?
-                pred_dist = self.model(x_c=sampled_pwm_1.reshape(-1,
-                                                                 self.den.seq_length,
+                pred_dist = self.model(x_c=generated_sequences.view(-1,
+                                                                 self.generated_sequence_length,
                                                                  4),
-                                       y_c=labels.to(self.device),
+                                       y_c=generated_labels.to(self.device),
                                        x_t=true_examples.to(self.device))
                 running_loss += -pred_dist.log_prob(true_labels).sum(-1).item()
                 predictions.append(pred_dist.base_dist.loc)

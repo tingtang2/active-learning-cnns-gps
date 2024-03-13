@@ -47,6 +47,6 @@ class KerasPretrainedDENPredictor(object):
 
         pred_outputs = self.predictor.predict([sequence_class, noise_1, noise_2], batch_size=self.batch_size)
 
-        _, _, _, optimized_pwm, _, _, _, _, _, hek_pred, _, _, _ = pred_outputs
+        _, _, _, optimized_pwm, _, sampled_pwm_1, _, _, _, hek_pred, _, _, _ = pred_outputs
 
-        return hek_pred
+        return sampled_pwm_1, hek_pred

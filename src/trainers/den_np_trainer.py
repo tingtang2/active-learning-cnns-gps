@@ -46,7 +46,10 @@ class NpDenTrainer(DenTrainer):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.model = SplicingConvCNP1d(inducer_net=UNet(in_channels=128), device=self.device).to(self.device)
+        self.rep_dim = 8
+        self.model = SplicingConvCNP1d(inducer_net=UNet(in_channels=self.rep_dim),
+                                       r_dim=self.rep_dim,
+                                       device=self.device).to(self.device)
 
         self.name = 'cnp_x_den'
         self.use_regularization = True
@@ -65,12 +68,12 @@ class NpDenTrainer(DenTrainer):
                 return running_loss
 
             sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask = self.den()
-            labels = self.oracle(sampled_pwm_1.reshape(-1, self.den.seq_length, 4))
+            labels = self.oracle(sampled_pwm_1.view(-1, self.den.seq_length, 4))
 
             # switch context and targets?
-            pred_dist = self.model(x_c=sampled_pwm_1.reshape(-1,
-                                                             self.den.seq_length,
-                                                             4),
+            pred_dist = self.model(x_c=sampled_pwm_1.view(-1,
+                                                          self.den.seq_length,
+                                                          4),
                                    y_c=labels.to(self.device),
                                    x_t=true_examples.to(self.device))
 
@@ -146,12 +149,12 @@ class NpDenTrainer(DenTrainer):
                     continue
 
                 sampled_pwm_1, sampled_pwm_2, pwm_1, onehot_mask, sampled_onehot_mask = self.den()
-                labels = self.oracle(sampled_pwm_1.reshape(-1, self.den.seq_length, 4))
+                labels = self.oracle(sampled_pwm_1.view(-1, self.den.seq_length, 4))
 
                 # switch context and targets?
-                pred_dist = self.model(x_c=sampled_pwm_1.reshape(-1,
-                                                                 self.den.seq_length,
-                                                                 4),
+                pred_dist = self.model(x_c=sampled_pwm_1.view(-1,
+                                                              self.den.seq_length,
+                                                              4),
                                        y_c=labels.to(self.device),
                                        x_t=true_examples.to(self.device))
                 running_loss += -pred_dist.log_prob(true_labels).sum(-1).item()

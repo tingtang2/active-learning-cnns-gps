@@ -48,7 +48,9 @@ class PretrainedDenNpTrainer(BaseTrainer):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.model = SplicingConvCNP1d(inducer_net=UNet(in_channels=128),
+        self.rep_dim = 32
+        self.model = SplicingConvCNP1d(inducer_net=UNet(in_channels=self.rep_dim),
+                                       r_dim=self.rep_dim,
                                        device=self.device,
                                        seq_len=109).to(self.device)
         self.pretrained_dens = {

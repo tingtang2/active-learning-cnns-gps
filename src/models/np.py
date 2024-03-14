@@ -112,6 +112,8 @@ def MultivariateNormalDiag(loc, scale_diag):
     return Independent(Normal(loc, scale_diag), 1)
 
 
+# code inspired from https://github.com/YannDubs/Neural-Process-Family/blob/master/npf/neuralproc/gridconvnp.py
+
 # custom ConvCNP for splicing data
 class SplicingConvCNP1d(nn.Module):
 
@@ -136,11 +138,20 @@ class SplicingConvCNP1d(nn.Module):
         self.encoder = inducer_net
 
         # TODO: think of a better way to set input dimensionality
+        # formula is 10 * 16 * 128 + (4 * 101)
         input_dim = -1
         if seq_len == 101:
-            input_dim = 82324
+            if r_dim == 128:
+                input_dim = 82324
+            if r_dim == 32:
+                input_dim = 20884
+            if r_dim == 8:
+                input_dim = 5524
         elif seq_len == 109:
-            input_dim = 410004
+            if r_dim == 128:
+                input_dim = 410004
+            if r_dim == 32:
+                input_dim = 102804
 
         self.decoder = nn.Sequential(MLP(n_in=input_dim,
                                          n_out=32,
@@ -151,7 +162,7 @@ class SplicingConvCNP1d(nn.Module):
         self.device = device
 
     def forward(self, x_c: torch.Tensor, y_c: torch.Tensor, x_t: torch.Tensor):
-        # batch, seq_len, 4 + 1
+        # batch, seq_len, 4 nucleotides + 1 label
         x_c = x_c.transpose(-1, -2)
         y_c_channel = y_c.repeat(x_c.size(2), 1, 1)
 
@@ -169,6 +180,7 @@ class SplicingConvCNP1d(nn.Module):
         func_rep = self.resizer(func_rep)
 
         func_rep = self.encoder(func_rep.transpose(-1, -2))
+        # print(func_rep.shape)
 
         if x_t.size(0) != 128:
             print(x_t.size(), func_rep.size())

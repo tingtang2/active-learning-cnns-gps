@@ -5,8 +5,8 @@ from torch import nn
 import torch
 import torch.nn as nn
 from torch.distributions import MultivariateNormal, Independent, Normal
-from torch.nn.common_types import _size_1_t
 from models.base_modules import MLP
+from models.base_cnn import BaseSeqFeatureExtractor
 
 import torch.nn.functional as F
 
@@ -123,7 +123,8 @@ class SplicingConvCNP1d(nn.Module):
                  dropout: float = 0.15,
                  x_dim: int = 5,
                  r_dim: int = 128,
-                 seq_len: int = 101):
+                 seq_len: int = 101,
+                 num_samples: int = 10):
         super(SplicingConvCNP1d, self).__init__()
 
         # first conv layer must produce positive vals to be intepreted as density
@@ -134,24 +135,26 @@ class SplicingConvCNP1d(nn.Module):
                                       padding=11 // 2,
                                       bias=False)
 
-        self.resizer = nn.Linear(2 * x_dim, r_dim)
+        self.seq_len = seq_len
+        self.resizer = nn.Linear(2 * x_dim * num_samples, r_dim)
         self.encoder = inducer_net
+        self.target_encoder = BaseSeqFeatureExtractor(seq_len=seq_len)
 
         # TODO: think of a better way to set input dimensionality
-        # formula is 10 * 16 * 128 + (4 * 101)
-        input_dim = -1
-        if seq_len == 101:
-            if r_dim == 128:
-                input_dim = 82324
-            if r_dim == 32:
-                input_dim = 20884
-            if r_dim == 8:
-                input_dim = 5524
-        elif seq_len == 109:
-            if r_dim == 128:
-                input_dim = 410004
-            if r_dim == 32:
-                input_dim = 102804
+        # formula is 2 * r_dim * 32 + (4 * 101)
+        input_dim = 2 * r_dim * 32 + (9 * 50)
+        # if seq_len == 101:
+        #     if r_dim == 128:
+        #         input_dim = 82324
+        #     if r_dim == 32:
+        #         input_dim = 20884
+        #     if r_dim == 8:
+        #         input_dim = 5524
+        # elif seq_len == 109:
+        #     if r_dim == 128:
+        #         input_dim = 410004
+        #     if r_dim == 32:
+        #         input_dim = 102804
 
         self.decoder = nn.Sequential(MLP(n_in=input_dim,
                                          n_out=32,
@@ -177,15 +180,17 @@ class SplicingConvCNP1d(nn.Module):
 
         func_rep = torch.cat((func_rep, density), dim=1).transpose(-1, -2)
 
-        func_rep = self.resizer(func_rep)
+        # batch * # samples, seq_len, r_dim
+        func_rep = self.resizer(func_rep.reshape(-1, self.seq_len, self.resizer.in_features))
 
         func_rep = self.encoder(func_rep.transpose(-1, -2))
-        # print(func_rep.shape)
 
         if x_t.size(0) != 128:
             print(x_t.size(), func_rep.size())
 
-        final_rep = torch.cat((func_rep.view(x_t.size(0), -1), x_t.view(x_t.size(0), -1)), dim=-1)
+        target_rep = self.target_encoder(x_t)
+
+        final_rep = torch.cat((func_rep.view(x_t.size(0), -1), target_rep.view(x_t.size(0), -1)), dim=-1)
 
         mu, sigma = self.decoder(final_rep).split(1, dim=-1)
         sigma = 0.01 + 0.99 * F.softplus(sigma)

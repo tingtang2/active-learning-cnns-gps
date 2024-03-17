@@ -46,7 +46,7 @@ class NpDenTrainer(DenTrainer):
 
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.rep_dim = 8
+        self.rep_dim = 128
         self.model = SplicingConvCNP1d(inducer_net=UNet(in_channels=self.rep_dim),
                                        r_dim=self.rep_dim,
                                        device=self.device).to(self.device)

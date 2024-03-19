@@ -13,6 +13,8 @@ from trainers.al_den_trainer import DenTrainer
 
 from torch.distributions.normal import Normal
 
+from torch.nn import MSELoss
+
 
 def gaussian_logpdf(inputs, mean, sigma, reduction=None):
     """Gaussian log-density.
@@ -52,7 +54,8 @@ class NpDenTrainer(DenTrainer):
                                        device=self.device).to(self.device)
 
         self.name = 'cnp_x_den'
-        self.use_regularization = True
+        self.use_regularization = False
+        self.criterion = MSELoss(reduction='sum')
 
     def train_epoch(self, loader: DataLoader):
         self.den.train()
@@ -77,7 +80,8 @@ class NpDenTrainer(DenTrainer):
                                    y_c=labels.to(self.device),
                                    x_t=true_examples.to(self.device))
 
-            loss = -pred_dist.log_prob(true_labels).sum(-1).mean()
+            # loss = -pred_dist.log_prob(true_labels).sum(-1)
+            loss = self.criterion(pred_dist.mean.squeeze(1), true_labels)
 
             if self.use_regularization:
                 # diversity + entropy loss
@@ -157,8 +161,9 @@ class NpDenTrainer(DenTrainer):
                                                               4),
                                        y_c=labels.to(self.device),
                                        x_t=true_examples.to(self.device))
-                running_loss += -pred_dist.log_prob(true_labels).sum(-1).item()
-                predictions.append(pred_dist.base_dist.loc)
+                # running_loss += -pred_dist.log_prob(true_labels).sum(-1).item()
+                running_loss += self.criterion(pred_dist.mean.squeeze(1), true_labels)
+                predictions.append(pred_dist.base_dist.mean.squeeze(1))
 
         if save_plot:
             # TODO: do plotting

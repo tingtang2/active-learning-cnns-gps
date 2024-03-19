@@ -142,7 +142,8 @@ class SplicingConvCNP1d(nn.Module):
 
         # TODO: think of a better way to set input dimensionality
         # formula is 2 * r_dim * 32 + (4 * 101)
-        input_dim = 2 * r_dim * 32 + (9 * 50)
+        # input_dim = 2 * r_dim * 32 + (9 * 50)
+        input_dim = 10726
         # if seq_len == 101:
         #     if r_dim == 128:
         #         input_dim = 82324
@@ -157,9 +158,9 @@ class SplicingConvCNP1d(nn.Module):
         #         input_dim = 102804
 
         self.decoder = nn.Sequential(MLP(n_in=input_dim,
-                                         n_out=32,
+                                         n_out=512,
                                          dropout=dropout),
-                                     nn.Linear(in_features=32,
+                                     nn.Linear(in_features=512,
                                                out_features=2))
 
         self.device = device
@@ -190,7 +191,9 @@ class SplicingConvCNP1d(nn.Module):
 
         target_rep = self.target_encoder(x_t)
 
-        final_rep = torch.cat((func_rep.view(x_t.size(0), -1), target_rep.view(x_t.size(0), -1)), dim=-1)
+        # final_rep = torch.cat((func_rep.view(x_t.size(0), -1), target_rep.view(x_t.size(0), -1)), dim=-1)
+
+        final_rep = target_rep
 
         mu, sigma = self.decoder(final_rep).split(1, dim=-1)
         sigma = 0.01 + 0.99 * F.softplus(sigma)

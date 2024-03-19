@@ -54,7 +54,7 @@ class NpDenTrainer(DenTrainer):
                                        device=self.device).to(self.device)
 
         self.name = 'cnp_x_den'
-        self.use_regularization = False
+        self.use_regularization = True
         self.criterion = MSELoss(reduction='sum')
 
     def train_epoch(self, loader: DataLoader):
@@ -162,7 +162,7 @@ class NpDenTrainer(DenTrainer):
                                        y_c=labels.to(self.device),
                                        x_t=true_examples.to(self.device))
                 # running_loss += -pred_dist.log_prob(true_labels).sum(-1).item()
-                running_loss += self.criterion(pred_dist.mean.squeeze(1), true_labels)
+                running_loss += self.criterion(pred_dist.mean.squeeze(1), true_labels).item()
                 predictions.append(pred_dist.base_dist.mean.squeeze(1))
 
         if save_plot:

@@ -144,7 +144,7 @@ class SplicingConvCNP1d(nn.Module):
         # formula is 2 * r_dim * 32 + (4 * 101)
         # input_dim = 2 * r_dim * 32 + (9 * 50)
         # input_dim = 10726
-        input_dim = 450
+        input_dim = 8642
         # if seq_len == 101:
         #     if r_dim == 128:
         #         input_dim = 82324
@@ -192,9 +192,9 @@ class SplicingConvCNP1d(nn.Module):
 
         target_rep = self.target_encoder(x_t)
 
-        # final_rep = torch.cat((func_rep.view(x_t.size(0), -1), target_rep.view(x_t.size(0), -1)), dim=-1)
+        final_rep = torch.cat((func_rep.view(x_t.size(0), -1), target_rep.view(x_t.size(0), -1)), dim=-1)
 
-        final_rep = torch.flatten(target_rep, start_dim=1)
+        # final_rep = torch.flatten(target_rep, start_dim=1)
 
         mu, sigma = self.decoder(final_rep).split(1, dim=-1)
         sigma = 0.01 + 0.99 * F.softplus(sigma)
